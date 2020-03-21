@@ -1,4 +1,4 @@
-SLIME SAT Solver:
+SLIME -- Copyright (c) 2020, Oscar Riveros, oscar.riveros@peqnp.science, Santiago, Chile. https://github.com/maxtuno/SLIME
 
 SLIME -- Copyright (c) 2019, Oscar Riveros, oscar.riveros@peqnp.science, Santiago, Chile. https://maxtuno.github.io/slime-sat-solver
 
