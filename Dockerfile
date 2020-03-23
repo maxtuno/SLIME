@@ -40,7 +40,7 @@ RUN cd SLIME
 RUN sh SLIME/build.sh
 
 ADD SLIME/mpi-run.sh supervised-scripts/mpi-run.sh
-ADD make_combined_hostfile.py supervised-scripts/make_combined_hostfile.py
+ADD SLIME/make_combined_hostfile.py supervised-scripts/make_combined_hostfile.py
 RUN chmod 755 supervised-scripts/mpi-run.sh
 EXPOSE 22
 
