@@ -35,6 +35,7 @@ RUN pip install supervisor awscli
 RUN apt-get install openmpi-bin openmpi-common libopenmpi-dev iputils-ping -y
 
 ADD SLIME SLIME
+RUN cd SLIME
 RUN sh SLIME/build.sh
 EXPOSE 22
 CMD SLIME/mpi-run.sh
