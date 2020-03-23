@@ -1,1 +1,1 @@
-mpirun -quiet --allow-run-as-root --mca btl_tcp_if_include eth0 -c=${NUM_PROCESSES} -np ${AWS_BATCH_JOB_NUM_NODES} /SLIME/bin/slime /SLIME/test.cnf 
+mpirun -quiet --allow-run-as-root -np 4 /SLIME/bin/slime /SLIME/test.cnf 
