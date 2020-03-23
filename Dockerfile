@@ -25,6 +25,7 @@ chown -R ${USER}:${USER} ${SSHDIR}/
 # check if ssh agent is running or not, if not, run
 RUN eval `ssh-agent -s` && ssh-add ${SSHDIR}/id_rsa
 
+
 RUN apt-get update
 RUN apt-get install wget -y
 RUN apt-get install unzip
@@ -37,5 +38,10 @@ RUN apt-get install openmpi-bin openmpi-common libopenmpi-dev iputils-ping -y
 ADD SLIME SLIME
 RUN cd SLIME
 RUN sh SLIME/build.sh
+
+ADD SLIME/mpi-run.sh supervised-scripts/mpi-run.sh
+ADD make_combined_hostfile.py supervised-scripts/make_combined_hostfile.py
+RUN chmod 755 supervised-scripts/mpi-run.sh
 EXPOSE 22
-CMD SLIME/mpi-run.sh
+
+CMD supervised-scripts/mpi-run.sh
