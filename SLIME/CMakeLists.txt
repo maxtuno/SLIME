@@ -10,7 +10,7 @@ include_directories(. include)
 find_package(MPI REQUIRED)
 if (MPI_FOUND)
     set(CMAKE_CXX_COMPILER mpicxx)
-    set(CMAKE_CXX_FLAGS "-std=c++98 -Os -D NDEBUG -D __STDC_LIMIT_MACROS -D __STDC_FORMAT_MACROS -D LOG -D MASSIVE")
+    set(CMAKE_CXX_FLAGS "-std=c++98 -Os -D NDEBUG -D __STDC_LIMIT_MACROS -D __STDC_FORMAT_MACROS -D MASSIVE") #-D LOG
     add_executable(slime
             src/Main.cc
             src/SimpSolver.cc
@@ -20,7 +20,7 @@ else (MPI_FOUND)
     message(SEND_ERROR "SLIME cannot compile without MPI")
 endif (MPI_FOUND)
 
-set(CMAKE_CXX_FLAGS "-std=c++98 -Os -D NDEBUG -D __STDC_LIMIT_MACROS -D __STDC_FORMAT_MACROS -D LOG")
+set(CMAKE_CXX_FLAGS "-std=c++98 -Os -D NDEBUG -D __STDC_LIMIT_MACROS -D __STDC_FORMAT_MACROS") #-D LOG
 
 add_executable(slime_cli
         src/Main.cc
