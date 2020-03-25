@@ -82,7 +82,7 @@ int main(int argc, char *argv[]) {
         sprintf(proof_file, "%s_%d", argv[2], rank);
         S.drup_file = fopen(proof_file, "wb");
 #else
-        S.drup_file = fopen(argv[3], "wb");
+        S.drup_file = fopen(argv[2], "wb");
 #endif
     }
 #endif
