@@ -17,19 +17,16 @@ if (MPI_FOUND)
             src/Solver.cc
             )
 else (MPI_FOUND)
-    message(SEND_ERROR "SLIME cannot compile without MPI")
+    set(CMAKE_CXX_FLAGS "-std=c++98 -Os -D NDEBUG -D __STDC_LIMIT_MACROS -D __STDC_FORMAT_MACROS") #-D LOG
+    add_executable(slime_cli
+            src/Main.cc
+            src/SimpSolver.cc
+            src/Solver.cc
+            )
+
+    add_library(ipasirslimeglue
+            src/SimpSolver.cc
+            src/Solver.cc
+            src/ipasirslimeglue.cc
+            )
 endif (MPI_FOUND)
-
-set(CMAKE_CXX_FLAGS "-std=c++98 -Os -D NDEBUG -D __STDC_LIMIT_MACROS -D __STDC_FORMAT_MACROS") #-D LOG
-
-add_executable(slime_cli
-        src/Main.cc
-        src/SimpSolver.cc
-        src/Solver.cc
-        )
-
-add_library(ipasirslimeglue
-        src/SimpSolver.cc
-        src/Solver.cc
-        src/ipasirslimeglue.cc
-        )
