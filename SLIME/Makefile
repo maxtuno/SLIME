@@ -27,9 +27,9 @@ CXX       ?= g++
 CFLAGS    ?= -ansi -Wno-parentheses
 LFLAGS    ?= 
 
-COPTIMIZE ?= -Os
+COPTIMIZE ?= -O3
 
-CFLAGS    += -I$(MROOT) -I$(DEPDIR)/include -I$(DEPDIR) -g0 -D __STDC_LIMIT_MACROS -D __STDC_FORMAT_MACROS -Wno-unused-variable -Wno-unused-label -Wno-reorder -Wno-unused-value
+CFLAGS    += -I$(MROOT) -I$(DEPDIR)/include -I$(DEPDIR) -g0 -D SAT_RACE -D __STDC_LIMIT_MACROS -D __STDC_FORMAT_MACROS -Wno-unused-variable -Wno-unused-label -Wno-reorder -Wno-unused-value
 LFLAGS    += 
 
 .PHONY : s p d r rs clean

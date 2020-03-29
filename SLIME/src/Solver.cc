@@ -1644,13 +1644,19 @@ static double luby(double y, int x) {
 // NOTE: assumptions passed in member-variable 'assumptions'.
 lbool Solver::solve_() {
 
-    int msec = 0, trigger = 1000; /* 10ms */
+    int msec = 0, trigger = 250;
     clock_t before = clock();
 
+#ifdef MASSIVE
     srand(time(NULL) + rank);
     for (int i = 0; i < polarity.size(); i++) {
         polarity[i] = rand() % 2;
     }
+#else
+    for (int i = 0; i < polarity.size(); i++) {
+        polarity[i] = i % 2;
+    }
+#endif
 
     model.clear();
     conflict.clear();
