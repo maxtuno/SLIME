@@ -1,8 +1,12 @@
 /***********************************************************************************[SimpSolver.cc]
-SLIME -- Copyright (c) 2019, Oscar Riveros, oscar.riveros@peqnp.science, Santiago, Chile. - Implementation of the The Booster Heuristic.
+SLIME -- Copyright (c) 2020, Oscar Riveros, oscar.riveros@peqnp.science, Santiago, Chile. https://github.com/maxtuno/SLIME
 
-Copyright (c) 2003-2006, Niklas Een, Niklas Sorensson
-Copyright (c) 2007,      Niklas Sorensson
+SLIME -- Copyright (c) 2019, Oscar Riveros, oscar.riveros@peqnp.science, Santiago, Chile. https://maxtuno.github.io/slime-sat-solver
+
+SLIME SAT Solver and The BOOST Heuristic or Variations cannot be used on any contest without express permissions of Oscar Riveros.
+
+MiniSat -- Copyright (c) 2006,      Niklas Een, Niklas Sorensson
+           Copyright (c) 2007-2010, Niklas Sorensson
 
 Chanseok Oh's MiniSat Patch Series -- Copyright (c) 2015, Chanseok Oh
 
@@ -28,9 +32,6 @@ DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
 OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 **************************************************************************************************/
 
-#include <math.h>
-#include <stdio.h>
-
 #include "SimpSolver.h"
 #include "mtl/Sort.h"
 
@@ -43,7 +44,7 @@ static bool opt_use_asymm = false;
 static bool opt_use_rcheck = false;
 static bool opt_use_elim = true;
 static int opt_grow = 0;
-static int opt_clause_lim = -1;
+static int opt_clause_lim = 20;
 static int opt_subsumption_lim = 1000;
 static double opt_simp_garbage_frac = 0.5;
 
@@ -62,8 +63,8 @@ SimpSolver::~SimpSolver() {}
 Var SimpSolver::newVar(bool sign, bool dvar) {
     Var v = Solver::newVar(sign, dvar);
 
-    frozen.push((char) false);
-    eliminated.push((char) false);
+    frozen.push((char)false);
+    eliminated.push((char)false);
 
     if (use_simplification) {
         n_occ.push(0);
@@ -78,9 +79,6 @@ Var SimpSolver::newVar(bool sign, bool dvar) {
 lbool SimpSolver::solve_(bool do_simp, bool turn_off_simp) {
     vec<Var> extra_frozen;
     lbool result = l_True;
-
-    Solver::log = log;
-    Solver::boost = boost;
 
     do_simp &= use_simplification;
 
@@ -104,6 +102,8 @@ lbool SimpSolver::solve_(bool do_simp, bool turn_off_simp) {
 
     if (result == l_True)
         result = Solver::solve_();
+    else if (verbosity >= 1)
+        printf("c ===============================================================================\n");
 
     if (result == l_True)
         extendModel();
@@ -183,6 +183,7 @@ bool SimpSolver::strengthenClause(CRef cr, Lit l) {
     assert(use_simplification);
 
     // FIX: this is too inefficient but would be nice to have (properly implemented)
+    // if (!find(subsumption_queue, &c))
     subsumption_queue.insert(cr);
 
     if (drup_file) {
@@ -243,7 +244,7 @@ bool SimpSolver::merge(const Clause &_ps, const Clause &_qs, Var v, vec<Lit> &ou
                 }
             out_clause.push(qs[i]);
         }
-        next:;
+    next:;
     }
 
     for (int i = 0; i < ps.size(); i++)
@@ -260,8 +261,8 @@ bool SimpSolver::merge(const Clause &_ps, const Clause &_qs, Var v, int &size) {
     bool ps_smallest = _ps.size() < _qs.size();
     const Clause &ps = ps_smallest ? _qs : _ps;
     const Clause &qs = ps_smallest ? _ps : _qs;
-    const Lit *__ps = (const Lit *) ps;
-    const Lit *__qs = (const Lit *) qs;
+    const Lit *__ps = (const Lit *)ps;
+    const Lit *__qs = (const Lit *)qs;
 
     size = ps.size() - 1;
 
@@ -277,7 +278,7 @@ bool SimpSolver::merge(const Clause &_ps, const Clause &_qs, Var v, int &size) {
                 }
             size++;
         }
-        next:;
+    next:;
     }
 
     return true;
@@ -329,7 +330,8 @@ bool SimpSolver::implied(const vec<Lit> &c) {
 }
 
 // Backward subsumption + backward subsumption resolution
-bool SimpSolver::backwardSubsumptionCheck() {
+bool SimpSolver::backwardSubsumptionCheck(bool verbose) {
+    int cnt = 0;
     int subsumed = 0;
     int deleted_literals = 0;
     assert(decisionLevel() == 0);
@@ -358,6 +360,9 @@ bool SimpSolver::backwardSubsumptionCheck() {
         if (c.mark())
             continue;
 
+        if (verbose && verbosity >= 2 && cnt++ % 1000 == 0)
+            printf("c subsumption left: %10d (%10d subsumed, %10d deleted literals)\r", subsumption_queue.size(), subsumed, deleted_literals);
+
         assert(c.size() > 1 || value(c[0]) == l_True); // Unit-clauses should have been propagated before this point.
 
         // Find best variable to scan:
@@ -368,7 +373,7 @@ bool SimpSolver::backwardSubsumptionCheck() {
 
         // Search all candidates:
         vec<CRef> &_cs = occurs.lookup(best);
-        CRef *cs = (CRef *) _cs;
+        CRef *cs = (CRef *)_cs;
 
         for (int j = 0; j < _cs.size(); j++)
             if (c.mark())
@@ -436,12 +441,12 @@ bool SimpSolver::asymmVar(Var v) {
     return backwardSubsumptionCheck();
 }
 
-static void mkElimClause(vec<int> &elimclauses, Lit x) {
+static void mkElimClause(vec<uint32_t> &elimclauses, Lit x) {
     elimclauses.push(toInt(x));
     elimclauses.push(1);
 }
 
-static void mkElimClause(vec<int> &elimclauses, Var v, Clause &c) {
+static void mkElimClause(vec<uint32_t> &elimclauses, Var v, Clause &c) {
     int first = elimclauses.size();
     int v_pos = -1;
 
@@ -456,7 +461,7 @@ static void mkElimClause(vec<int> &elimclauses, Var v, Clause &c) {
 
     // Swap the first literal with the 'v' literal, so that the literal
     // containing 'v' will occur first in the clause:
-    int tmp = elimclauses[v_pos];
+    uint32_t tmp = elimclauses[v_pos];
     elimclauses[v_pos] = elimclauses[first];
     elimclauses[first] = tmp;
 
@@ -566,7 +571,7 @@ void SimpSolver::extendModel() {
 
         x = toLit(elimclauses[i]);
         model[var(x)] = lbool(!sign(x));
-        next:;
+    next:;
     }
 }
 
@@ -596,38 +601,24 @@ bool SimpSolver::eliminate(bool turn_off_elim) {
     if (nVars() == 0)
         goto cleanup; // User disabling preprocessing.
 
-    res = eliminate_(); // The first, usual variable elimination of MiniSat.
-
-    if (!res)
-        goto cleanup;
-
     // Get an initial number of clauses (more accurately).
     if (trail.size() != 0)
         removeSatisfied();
-
     n_cls_init = nClauses();
+
+    res = eliminate_(); // The first, usual variable elimination of MiniSat.
+    if (!res)
+        goto cleanup;
+
     n_cls = nClauses();
     n_vars = nFreeVars();
 
-    if (log) {
-#ifdef MASSIVE
-#else
+    if (log && rank == 0) {
         printf("c Reduced to %d vars, %d cls (grow=%d)\n", n_vars, n_cls, grow);
-#endif
     }
 
-    if ((double) n_cls / n_vars >= 10 || n_vars < 1000 || trail.size() == 0) {
-        if (log) {
-#ifdef MASSIVE
-#else
-            printf("c No iterative elimination performed. (vars=%d, c/v ratio=%.1f)\n", n_vars, (double)n_cls / n_vars);
-#endif
-        }
-        goto cleanup;
-    }
-
-    grow = grow ? grow * 2 : 8;
-    for (; grow < 1000; grow *= 2) {
+    grow++;
+    for (; grow <= nVars(); grow++) {
         // Rebuild elimination variable heap.
         for (int i = 0; i < clauses.size(); i++) {
             const Clause &c = ca[clauses[i]];
@@ -649,14 +640,22 @@ bool SimpSolver::eliminate(bool turn_off_elim) {
         int n_cls_now = nClauses();
         int n_vars_now = nFreeVars();
 
-        double cl_inc_rate = (double) n_cls_now / n_cls_last;
-        double var_dec_rate = (double) n_vars_last / n_vars_now;
+        double cl_inc_rate = (double)n_cls_now / n_cls_last;
+        double var_dec_rate = (double)n_vars_last / n_vars_now;
+
+        if (log && rank == 0) {
+            printf("c Reduced to %d vars, %d cls (grow=%d)\n", n_vars_now, n_cls_now, grow);
+            // printf("c cl_inc_rate=%.3f, var_dec_rate=%.3f\n", cl_inc_rate, var_dec_rate);
+        }
 
         if (n_cls_now > n_cls_init || cl_inc_rate > var_dec_rate)
             break;
     }
+    if (log && rank == 0) {
+        printf("c No. effective iterative eliminations: %d\n", iter);
+    }
 
-    cleanup:
+cleanup:
     touched.clear(true);
     occurs.clear(true);
     n_occ.clear(true);
@@ -688,7 +687,7 @@ bool SimpSolver::eliminate_() {
 
         gatherTouchedClauses();
         // printf("  ## (time = %6.2f s) BWD-SUB: queue = %d, trail = %d\n", cpuTime(), subsumption_queue.size(), trail.size() - bwdsub_assigns);
-        if ((subsumption_queue.size() > 0 || bwdsub_assigns < trail.size()) && !backwardSubsumptionCheck()) {
+        if ((subsumption_queue.size() > 0 || bwdsub_assigns < trail.size()) && !backwardSubsumptionCheck(true)) {
             ok = false;
             goto cleanup;
         }
@@ -711,6 +710,9 @@ bool SimpSolver::eliminate_() {
 
             if (isEliminated(elim) || value(elim) != l_Undef)
                 continue;
+
+            if (verbosity >= 2 && cnt % 100 == 0)
+                printf("c elimination left: %10d\r", elim_heap.size());
 
             if (use_asymm) {
                 // Temporarily freeze variable. Otherwise, it would immediately end up on the queue again:
@@ -735,7 +737,7 @@ bool SimpSolver::eliminate_() {
 
         assert(subsumption_queue.size() == 0);
     }
-    cleanup:
+cleanup:
     // To get an accurate number of clauses.
     if (trail_size_last != trail.size())
         removeSatisfied();
@@ -747,6 +749,9 @@ bool SimpSolver::eliminate_() {
         clauses.shrink(i - j);
     }
     checkGarbage();
+
+    if (verbosity >= 1 && elimclauses.size() > 0)
+        printf("c |  Eliminated clauses:     %10.2f Mb                                      |\n", double(elimclauses.size() * sizeof(uint32_t)) / (1024 * 1024));
 
     return ok;
 }
@@ -785,5 +790,7 @@ void SimpSolver::garbageCollect() {
     to.extra_clause_field = ca.extra_clause_field; // NOTE: this is important to keep (or lose) the extra fields.
     relocAll(to);
     Solver::relocAll(to);
+    if (verbosity >= 2)
+        printf("c |  Garbage collection:   %12d bytes => %12d bytes             |\n", ca.size() * ClauseAllocator::Unit_Size, to.size() * ClauseAllocator::Unit_Size);
     to.moveTo(ca);
 }

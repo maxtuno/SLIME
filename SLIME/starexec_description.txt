@@ -1,1 +1,1 @@
-SLIME 4: A Free World Class High Performance SAT Solver.
+SLIME Cloud: A Free Massive World Class High Performance SAT Solver.

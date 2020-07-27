@@ -1,8 +1,12 @@
 /****************************************************************************************[Solver.h]
-SLIME -- Copyright (c) 2019, Oscar Riveros, oscar.riveros@peqnp.science, Santiago, Chile. - Implementation of the The Booster Heuristic.
+SLIME -- Copyright (c) 2020, Oscar Riveros, oscar.riveros@peqnp.science, Santiago, Chile. https://github.com/maxtuno/SLIME
 
-Copyright (c) 2003-2006, Niklas Een, Niklas Sorensson
-Copyright (c) 2007,      Niklas Sorensson
+SLIME -- Copyright (c) 2019, Oscar Riveros, oscar.riveros@peqnp.science, Santiago, Chile. https://maxtuno.github.io/slime-sat-solver
+
+SLIME SAT Solver and The BOOST Heuristic or Variations cannot be used on any contest without express permissions of Oscar Riveros.
+
+MiniSat -- Copyright (c) 2003-2006, Niklas Een, Niklas Sorensson
+           Copyright (c) 2007-2010, Niklas Sorensson
 
 Chanseok Oh's MiniSat Patch Series -- Copyright (c) 2015, Chanseok Oh
 
@@ -11,6 +15,9 @@ Reference: M. Luo, C.-M. Li, F. Xiao, F. Manya, and Z. L. , “An effective lear
 
 Maple_LCM_Dist, Based on Maple_LCM -- Copyright (c) 2017, Fan Xiao, Chu-Min LI, Mao Luo: using a new branching heuristic called Distance at the beginning of search
 
+MapleLCMDistChronoBT, based on Maple_LCM_Dist -- Copyright (c), Alexander Nadel, Vadim Ryvchin: "Chronological Backtracking" in SAT-2018, pp. 111-121.
+
+MapleLCMDistChronoBT-DL, based on MapleLCMDistChronoBT -- Copyright (c), Stepan Kochemazov, Oleg Zaikin, Victor Kondratiev, Alexander Semenov: The solver was augmented with heuristic that moves duplicate learnt clauses into the core/tier2 tiers depending on a number of parameters.
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of this software and
 associated documentation files (the "Software"), to deal in the Software without restriction,
@@ -28,8 +35,8 @@ DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
 OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 **************************************************************************************************/
 
-#ifndef SLIME_Solver_h
-#define SLIME_Solver_h
+#ifndef Minisat_Solver_h
+#define Minisat_Solver_h
 
 #define ANTI_EXPLORATION
 #define BIN_DRUP
@@ -48,7 +55,21 @@ OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWA
 #include "mtl/Heap.h"
 #include "mtl/Vec.h"
 
-// Don't change the actual numbers.
+// duplicate learnts version
+#include <algorithm>
+#include <chrono>
+#include <cmath>
+#include <csignal>
+#include <map>
+#include <set>
+#include <unordered_map>
+#include <unordered_set>
+#include <vector>
+
+#ifdef MASSIVE
+#include <mpi.h>
+#endif
+
 #define LOCAL 0
 #define TIER2 2
 #define CORE 3
@@ -59,15 +80,15 @@ namespace SLIME {
 // Solver -- the main class:
 
 class Solver {
-  protected:
-    bool log, boost;
-    int global;
+  public:
+    bool log, boost, render;
+    int global, cursor, rank, master;
 
-private:
+  private:
     template <typename T> class MyQueue {
         int max_sz, q_sz;
         int ptr;
-        int sum;
+        int64_t sum;
         vec<T> q;
 
       public:
@@ -105,25 +126,6 @@ private:
     };
 
   public:
-
-    void* termCallbackState;
-    int (*termCallback)(void* state);
-    void setTermCallback(void* state, int (*termCallback)(void*)) {
-        this->termCallbackState = state;
-        this->termCallback = termCallback;
-    }
-
-    void* learnCallbackState;
-    int* learnCallbackBuffer;
-    int learnCallbackLimit;
-    void (*learnCallback)(void * state, int * clause);
-    void setLearnCallback(void * state, int maxLength, void (*learn)(void * state, int * clause)) {
-        this->learnCallbackState = state;
-        this->learnCallbackLimit = maxLength;
-        this->learnCallbackBuffer = (int*) realloc (this->learnCallbackBuffer, (1+maxLength)*sizeof(int));
-        this->learnCallback = learn;
-    }
-
     // Constructor/Destructor:
     //
     Solver();
@@ -181,8 +183,8 @@ private:
 
     // Resource contraints:
     //
-    void setConfBudget(int x);
-    void setPropBudget(int x);
+    void setConfBudget(int64_t x);
+    void setPropBudget(int64_t x);
     void budgetOff();
     void interrupt();      // Trigger a (potentially asynchronous) interruption of the solver.
     void clearInterrupt(); // Clear interrupt indicator flag.
@@ -202,6 +204,7 @@ private:
     // Mode of operation:
     //
     FILE *drup_file;
+    int verbosity;
     double step_size;
     double step_size_dec;
     double min_step_size;
@@ -225,42 +228,36 @@ private:
     int learntsize_adjust_start_confl;
     double learntsize_adjust_inc;
 
+    // duplicate learnts version
+
+    uint32_t min_number_of_learnts_copies;
+    uint32_t dupl_db_init_size;
+    uint32_t max_lbd_dup;
+    std::chrono::microseconds duptime;
+    // duplicate learnts version
+
     // Statistics: (read-only member variable)
     //
-    int solves, starts, decisions, rnd_decisions, propagations, conflicts, conflicts_VSIDS;
-    int dec_vars, clauses_literals, learnts_literals, max_literals, tot_literals;
-    int chrono_backtrack, non_chrono_backtrack;
+    uint64_t solves, starts, decisions, rnd_decisions, propagations, conflicts, conflicts_VSIDS;
+    uint64_t dec_vars, clauses_literals, learnts_literals, max_literals, tot_literals;
+    uint64_t chrono_backtrack, non_chrono_backtrack;
 
-    vec<int> picked;
-    vec<int> conflicted;
-    vec<int> almost_conflicted;
+    // duplicate learnts version
+    uint64_t duplicates_added_conflicts;
+    uint64_t duplicates_added_tier2;
+    uint64_t duplicates_added_minimization;
+    uint64_t dupl_db_size;
+
+    // duplicate learnts version
+
+    vec<uint32_t> picked;
+    vec<uint32_t> conflicted;
+    vec<uint32_t> almost_conflicted;
 #ifdef ANTI_EXPLORATION
-    vec<int> canceled;
+    vec<uint32_t> canceled;
 #endif
 
-    // HACK to expose propagation for Open-WBO
-    bool propagateLit(Lit l, vec<Lit> &implied) {
-        cancelUntil(0);
-
-        // literal is an unit clause
-        if (value(l) != l_Undef) {
-            return value(l) == l_False;
-        }
-        assert(value(l) == l_Undef);
-
-        newDecisionLevel();
-        uncheckedEnqueue(l);
-        int a = trail.size();
-        CRef cr = propagate();
-        for (int i = a; i < trail.size(); i++) {
-            implied.push(trail[i]);
-        }
-        cancelUntil(0);
-        return (cr != CRef_Undef);
-    }
-
-        int rank;
-    protected:
+  protected:
     // Helper structures:
     //
     struct VarData {
@@ -319,19 +316,25 @@ private:
     vec<VarData> vardata;                                    // Stores reason and level for each variable.
     int qhead;                                               // Head of queue (as index into the trail -- no more explicit propagation queue in MiniSat).
     int simpDB_assigns;                                      // Number of top-level assignments since last execution of 'simplify()'.
-    int simpDB_props;                                    // Remaining number of propagations that must be made before next execution of 'simplify()'.
+    int64_t simpDB_props;                                    // Remaining number of propagations that must be made before next execution of 'simplify()'.
     vec<Lit> assumptions;                                    // Current set of assumptions provided to solve by the user.
     Heap<VarOrderLt> order_heap_CHB,                         // A priority queue of variables ordered with respect to the variable activity.
         order_heap_VSIDS, order_heap_distance;
-    bool remove_satisfied; // Indicates whether possibly inefficient linear scan for satisfied clauses should be performed in 'simplify'.
+    double progress_estimate; // Set by 'search()'.
+    bool remove_satisfied;    // Indicates whether possibly inefficient linear scan for satisfied clauses should be performed in 'simplify'.
 
     int core_lbd_cut;
     float global_lbd_sum;
     MyQueue<int> lbd_queue; // For computing moving averages of recent LBD values.
 
-    int next_T2_reduce, next_L_reduce;
+    uint64_t next_T2_reduce, next_L_reduce;
 
     ClauseAllocator ca;
+
+    // duplicate learnts version
+    std::map<int32_t, std::map<uint32_t, std::unordered_map<uint64_t, uint32_t> > > ht;
+
+    // duplicate learnts version
 
     int confl_to_chrono;
     int chrono;
@@ -345,8 +348,8 @@ private:
     vec<Lit> add_tmp;
     vec<Lit> add_oc;
 
-    vec<int> seen2; // Mostly for efficient LBD computation. 'seen2[i]' will indicate if decision level or variable 'i' has been seen.
-    int counter;    // Simple counter for marking purpose with 'seen2'.
+    vec<uint64_t> seen2; // Mostly for efficient LBD computation. 'seen2[i]' will indicate if decision level or variable 'i' has been seen.
+    uint64_t counter;    // Simple counter for marking purpose with 'seen2'.
 
     double max_learnts;
     double learntsize_adjust_confl;
@@ -354,8 +357,8 @@ private:
 
     // Resource contraints:
     //
-    int conflict_budget;    // -1 means no budget.
-    int propagation_budget; // -1 means no budget.
+    int64_t conflict_budget;    // -1 means no budget.
+    int64_t propagation_budget; // -1 means no budget.
     bool asynch_interrupt;
 
     // Main internal methods:
@@ -368,8 +371,8 @@ private:
     CRef propagate();                                                               // Perform unit propagation. Returns possibly conflicting clause.
     void cancelUntil(int level);                                                    // Backtrack until a certain level.
     void analyze(CRef confl, vec<Lit> &out_learnt, int &out_btlevel, int &out_lbd); // (bt = backtrack)
-        // COULD THIS BE IMPLEMENTED BY THE ORDINARIY "analyze" BY SOME REASONABLE GENERALIZATION?
-    bool litRedundant(Lit p, int abstract_levels);                             // (helper method for 'analyze()')
+    void analyzeFinal(Lit p, vec<Lit> &out_conflict);                               // COULD THIS BE IMPLEMENTED BY THE ORDINARIY "analyze" BY SOME REASONABLE GENERALIZATION?
+    bool litRedundant(Lit p, uint32_t abstract_levels);                             // (helper method for 'analyze()')
     lbool search(int &nof_conflicts);                                               // Search for a given number of conflicts.
     lbool solve_();                                                                 // Main solve method (assumptions given in 'assumptions').
     void reduceDB();                                                                // Reduce the set of learnt clauses.
@@ -396,10 +399,14 @@ private:
 
     void relocAll(ClauseAllocator &to);
 
+    // duplicate learnts version
+    int is_duplicate(std::vector<uint32_t> &c); // returns TRUE if a clause is duplicate
+    // duplicate learnts version
+
     // Misc:
     //
     int decisionLevel() const;           // Gives the current decisionlevel.
-    int abstractLevel(Var x) const; // Used to represent an abstraction of sets of decision levels.
+    uint32_t abstractLevel(Var x) const; // Used to represent an abstraction of sets of decision levels.
     CRef reason(Var x) const;
 
     ConflictData FindConflictLevel(CRef cind);
@@ -466,15 +473,8 @@ private:
     }
 
     static inline void binDRUP_flush(FILE *drup_file) {
-#if defined(__linux__)
-#ifdef SAT_RACE
-        fwrite_unlocked(drup_buf, sizeof(unsigned char), buf_len, drup_file);
-#else
         fwrite(drup_buf, sizeof(unsigned char), buf_len, drup_file);
-#endif
-#else
-        fwrite(drup_buf, sizeof(unsigned char), buf_len, drup_file);
-#endif
+        // fwrite_unlocked(drup_buf, sizeof(unsigned char), buf_len, drup_file);
         buf_ptr = drup_buf;
         buf_len = 0;
     }
@@ -499,17 +499,17 @@ private:
   public:
     bool simplifyAll();
     void simplifyLearnt(Clause &c);
-
-        bool simplifyLearnt_core();
+    bool simplifyLearnt_x(vec<CRef> &learnts_x);
+    bool simplifyLearnt_core();
     bool simplifyLearnt_tier2();
     int trailRecord;
-
-        void cancelUntilTrailRecord();
+    void litsEnqueue(int cutP, Clause &c);
+    void cancelUntilTrailRecord();
     void simpleUncheckEnqueue(Lit p, CRef from = CRef_Undef);
     CRef simplePropagate();
-    int nbSimplifyAll;
-    int simplified_length_record, original_length_record;
-    int s_propagations;
+    uint64_t nbSimplifyAll;
+    uint64_t simplified_length_record, original_length_record;
+    uint64_t s_propagations;
 
     vec<Lit> simp_learnt_clause;
     vec<CRef> simp_reason_clause;
@@ -518,18 +518,50 @@ private:
     // in redundant
     bool removed(CRef cr);
     // adjust simplifyAll occasion
-    int curSimplify;
+    long curSimplify;
     int nbconfbeforesimplify;
     int incSimplify;
 
     bool collectFirstUIP(CRef confl);
     vec<double> var_iLevel, var_iLevel_tmp;
-        vec<int> pathCs;
-
-        double var_iLevel_inc;
+    uint64_t nbcollectfirstuip, nblearntclause, nbDoubleConflicts, nbTripleConflicts;
+    int uip1, uip2;
+    vec<int> pathCs;
+    uint64_t previousStarts;
+    double var_iLevel_inc;
     vec<Lit> involved_lits;
     double my_var_decay;
     bool DISTANCE;
+
+  private:
+    //  to avoid the init_soln of two LS too near.
+    int restarts_gap = 300;
+    //  if trail.size() over c*nVars or p*max_trail, call ls.
+    float conflict_ratio = 0.4;
+    float percent_ratio = 0.9;
+    //  control ls time total use.
+    float up_time_ratio = 0.2;
+    //  control ls memory use per call.
+    long long ls_mems_num = 50 * 1000 * 1000;
+    //  control the rephase rate based on restarts;
+    // int     rephase_mod         = 10000;
+    //  the LS used in the first # seconds is to initialize a good ls_best_soln,
+    //  after # seconds, the
+    // int     state_change_time   = 100;//seconds
+    int state_change_time = 2000; // starts
+    //  whether the mediation_soln is used as rephase, if not
+    bool mediation_used = false;
+
+    int switch_heristic_mod = 500; // starts
+    int last_switch_conflicts;
+
+    // informations
+    int freeze_ls_restart_num = 0;
+    double ls_used_time = 0;
+    int ls_call_num = 0;
+    int ls_best_unsat_num = INT_MAX;
+    bool solved_by_ls = false;
+    int max_trail = 0;
 };
 
 //=================================================================================================
@@ -611,7 +643,7 @@ inline bool Solver::locked(const Clause &c) const {
 inline void Solver::newDecisionLevel() { trail_lim.push(trail.size()); }
 
 inline int Solver::decisionLevel() const { return trail_lim.size(); }
-inline int Solver::abstractLevel(Var x) const { return 1 << (level(x) & 31); }
+inline uint32_t Solver::abstractLevel(Var x) const { return 1 << (level(x) & 31); }
 inline lbool Solver::value(Var x) const { return assigns[x]; }
 inline lbool Solver::value(Lit p) const { return assigns[var(p)] ^ sign(p); }
 inline lbool Solver::modelValue(Var x) const { return model[x]; }
@@ -635,12 +667,12 @@ inline void Solver::setDecisionVar(Var v, bool b) {
         order_heap_distance.insert(v);
     }
 }
-inline void Solver::setConfBudget(int x) { conflict_budget = conflicts + x; }
-inline void Solver::setPropBudget(int x) { propagation_budget = propagations + x; }
+inline void Solver::setConfBudget(int64_t x) { conflict_budget = conflicts + x; }
+inline void Solver::setPropBudget(int64_t x) { propagation_budget = propagations + x; }
 inline void Solver::interrupt() { asynch_interrupt = true; }
 inline void Solver::clearInterrupt() { asynch_interrupt = false; }
 inline void Solver::budgetOff() { conflict_budget = propagation_budget = -1; }
-inline bool Solver::withinBudget() const { return 0 == termCallback(termCallbackState); }
+inline bool Solver::withinBudget() const { return !asynch_interrupt && (conflict_budget < 0 || conflicts < (uint64_t)conflict_budget) && (propagation_budget < 0 || propagations < (uint64_t)propagation_budget); }
 
 // FIXME: after the introduction of asynchronous interrruptions the solve-versions that return a
 // pure bool do not give a safe interface. Either interrupts must be possible to turn off here, or
