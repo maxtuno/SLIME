@@ -1,10 +1,4 @@
 /************************************************************************************[SimpSolver.h]
-SLIME -- Copyright (c) 2020, Oscar Riveros, oscar.riveros@peqnp.science, Santiago, Chile. https://github.com/maxtuno/SLIME
-
-SLIME -- Copyright (c) 2019, Oscar Riveros, oscar.riveros@peqnp.science, Santiago, Chile. https://maxtuno.github.io/slime-sat-solver
-
-SLIME SAT Solver and The BOOST Heuristic or Variations cannot be used on any contest without express permissions of Oscar Riveros.
-
 MiniSat -- Copyright (c) 2006,      Niklas Een, Niklas Sorensson
            Copyright (c) 2007-2010, Niklas Sorensson
 
@@ -39,13 +33,14 @@ OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWA
 #include "Solver.h"
 
 
-namespace SLIME {
+namespace Minisat {
 
 //=================================================================================================
 
 
 class SimpSolver : public Solver {
  public:
+    bool log;
     // Constructor/Destructor:
     //
     SimpSolver();

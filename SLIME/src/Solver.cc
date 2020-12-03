@@ -1,10 +1,4 @@
 /***************************************************************************************[Solver.cc]
-SLIME -- Copyright (c) 2020, Oscar Riveros, oscar.riveros@peqnp.science, Santiago, Chile. https://github.com/maxtuno/SLIME
-
-SLIME -- Copyright (c) 2019, Oscar Riveros, oscar.riveros@peqnp.science, Santiago, Chile. https://maxtuno.github.io/slime-sat-solver
-
-SLIME SAT Solver and The BOOST Heuristic or Variations cannot be used on any contest without express permissions of Oscar Riveros.
-
 MiniSat -- Copyright (c) 2003-2006, Niklas Een, Niklas Sorensson
            Copyright (c) 2007-2010, Niklas Sorensson
 
@@ -35,10 +29,18 @@ DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
 OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 **************************************************************************************************/
 
-#include <random>
+#include <algorithm>
+#include <math.h>
+
 #include "Solver.h"
 #include "mtl/Sort.h"
-using namespace SLIME;
+using namespace Minisat;
+
+#ifdef MASSIVE
+
+#include <mpi.h>
+
+#endif
 
 #ifdef BIN_DRUP
 int Solver::buf_len = 0;
@@ -49,25 +51,35 @@ unsigned char *Solver::buf_ptr = drup_buf;
 //=================================================================================================
 // Options:
 
-static double opt_step_size = 0.40;
-static double opt_step_size_dec = 0.000001;
-static double opt_min_step_size = 0.06;
-static double opt_var_decay = 0.80;
-static double opt_clause_decay = 0.999;
-static double opt_random_var_freq = 0;
-static double opt_random_seed = 136983539;
-static int opt_ccmin_mode = 2;
-static int opt_phase_saving = 2;
-static bool opt_rnd_init_act = false;
-static int opt_restart_first = 100;
-static double opt_restart_inc = 2;
-static double opt_garbage_frac = 0.20;
-static int opt_chrono = 100;
-static int opt_conf_to_chrono = 4000;
-static int opt_max_lbd_dup = 14;
-static int opt_min_dupl_app = 2;
-static int opt_dupl_db_init_size = 1000000;
+static const char *_cat = "CORE";
 
+static DoubleOption opt_step_size(_cat, "step-size", "Initial step size", 0.40, DoubleRange(0, false, 1, false));
+static DoubleOption opt_step_size_dec(_cat, "step-size-dec", "Step size decrement", 0.000001, DoubleRange(0, false, 1, false));
+static DoubleOption opt_min_step_size(_cat, "min-step-size", "Minimal step size", 0.06, DoubleRange(0, false, 1, false));
+static DoubleOption opt_var_decay(_cat, "var-decay", "The variable activity decay factor", 0.80, DoubleRange(0, false, 1, false));
+static DoubleOption opt_clause_decay(_cat, "cla-decay", "The clause activity decay factor", 0.999, DoubleRange(0, false, 1, false));
+static DoubleOption opt_random_var_freq(_cat, "rnd-freq", "The frequency with which the decision heuristic tries to choose a random variable", 0, DoubleRange(0, true, 1, true));
+static DoubleOption opt_random_seed(_cat, "rnd-seed", "Used by the random variable selection", 91648253, DoubleRange(0, false, HUGE_VAL, false));
+static IntOption opt_ccmin_mode(_cat, "ccmin-mode", "Controls conflict clause minimization (0=none, 1=basic, 2=deep)", 2, IntRange(0, 2));
+static IntOption opt_phase_saving(_cat, "phase-saving", "Controls the level of phase saving (0=none, 1=limited, 2=full)", 2, IntRange(0, 2));
+static BoolOption opt_rnd_init_act(_cat, "rnd-init", "Randomize the initial activity", false);
+static IntOption opt_restart_first(_cat, "rfirst", "The base restart interval", 100, IntRange(1, INT32_MAX));
+static DoubleOption opt_restart_inc(_cat, "rinc", "Restart interval increase factor", 2, DoubleRange(1, false, HUGE_VAL, false));
+static DoubleOption opt_garbage_frac(_cat, "gc-frac", "The fraction of wasted memory allowed before a garbage collection is triggered", 0.20, DoubleRange(0, false, HUGE_VAL, false));
+static IntOption opt_chrono(_cat, "chrono", "Controls if to perform chrono backtrack", 100, IntRange(-1, INT32_MAX));
+static IntOption opt_conf_to_chrono(_cat, "confl-to-chrono", "Controls number of conflicts to perform chrono backtrack", 4000, IntRange(-1, INT32_MAX));
+
+static IntOption opt_max_lbd_dup("DUP-LEARNTS", "lbd-limit", "specifies the maximum lbd of learnts to be screened for duplicates.", 14, IntRange(0, INT32_MAX));
+static IntOption opt_min_dupl_app("DUP-LEARNTS", "min-dup-app", "specifies the minimum number of learnts to be included into db.", 2, IntRange(2, INT32_MAX));
+static IntOption opt_dupl_db_init_size("DUP-LEARNTS", "dupdb-init", "specifies the initial maximal duplicates DB size.", 1000000, IntRange(1, INT32_MAX));
+static IntOption opt_VSIDS_props_limit("DUP-LEARNTS", "VSIDS-lim", "specifies the number of propagations after which the solver switches between LRB and VSIDS(in millions).", 30, IntRange(1, INT32_MAX));
+
+static DoubleOption opt_lsids_erase_weight("LSIDS", "lsids-erase-weight", "Weight for LSIDS bump.", 2.0, DoubleRange(0, true, 5, true));
+
+static BoolOption opt_boost("BOOST", "boost", "Specifies the use BOOST algorithm.", true);
+static BoolOption opt_hess("HESS", "hess", "Specifies the use HESS algorithm.", false);
+static IntOption opt_hess_order("HESS", "hess-order", "Specifies the order of HESS algorithm.", 1, IntRange(1, 2));
+static BoolOption opt_massive("MASSIVE", "massive", "Specifies the use for MASSIVE execution.", false);
 //=================================================================================================
 // Constructor/Destructor:
 
@@ -79,8 +91,7 @@ Solver::Solver()
       drup_file(NULL), verbosity(0), step_size(opt_step_size), step_size_dec(opt_step_size_dec), min_step_size(opt_min_step_size), timer(5000), var_decay(opt_var_decay), clause_decay(opt_clause_decay), random_var_freq(opt_random_var_freq), random_seed(opt_random_seed), VSIDS(false), ccmin_mode(opt_ccmin_mode), phase_saving(opt_phase_saving), rnd_pol(false), rnd_init_act(opt_rnd_init_act), garbage_frac(opt_garbage_frac), restart_first(opt_restart_first), restart_inc(opt_restart_inc)
 
       ,
-      min_number_of_learnts_copies(opt_min_dupl_app), max_lbd_dup(opt_max_lbd_dup), dupl_db_init_size(opt_dupl_db_init_size)
-
+      min_number_of_learnts_copies(opt_min_dupl_app), max_lbd_dup(opt_max_lbd_dup), dupl_db_init_size(opt_dupl_db_init_size), VSIDS_props_limit(opt_VSIDS_props_limit * 1000000), boost(opt_boost), hess(opt_hess), hess_order(opt_hess_order), massive(opt_massive)
       // Parameters (the rest):
       //
       ,
@@ -89,15 +100,14 @@ Solver::Solver()
       // Parameters (experimental):
       //
       ,
-      learntsize_adjust_start_confl(100), learntsize_adjust_inc(1.5)
-
+      learntsize_adjust_start_confl(100), learntsize_adjust_inc(1.5), lsids_erase_bump_weight(opt_lsids_erase_weight)
       // Statistics: (formerly in 'SolverStats')
       //
       ,
       solves(0), starts(0), decisions(0), rnd_decisions(0), propagations(0), conflicts(0), conflicts_VSIDS(0), dec_vars(0), clauses_literals(0), learnts_literals(0), max_literals(0), tot_literals(0), chrono_backtrack(0), non_chrono_backtrack(0)
 
       ,
-      ok(true), cla_inc(1), var_inc(1), watches_bin(WatcherDeleted(ca)), watches(WatcherDeleted(ca)), qhead(0), simpDB_assigns(-1), simpDB_props(0), order_heap_CHB(VarOrderLt(activity_CHB)), order_heap_VSIDS(VarOrderLt(activity_VSIDS)), progress_estimate(0), remove_satisfied(true)
+      ok(true), cla_inc(1), var_inc(1), lit_inc(1), watches_bin(WatcherDeleted(ca)), watches(WatcherDeleted(ca)), qhead(0), simpDB_assigns(-1), simpDB_props(0), order_heap_CHB(VarOrderLt(activity_CHB)), order_heap_VSIDS(VarOrderLt(activity_VSIDS)), progress_estimate(0), remove_satisfied(true)
 
       ,
       core_lbd_cut(2), global_lbd_sum(0), lbd_queue(50), next_T2_reduce(10000), next_L_reduce(15000), confl_to_chrono(opt_conf_to_chrono), chrono(opt_chrono)
@@ -181,6 +191,41 @@ CRef Solver::simplePropagate() {
                 continue;
             }
 
+            // Look for new watch:
+            // if (incremental)
+            //{ // ----------------- INCREMENTAL MODE
+            //  int choosenPos = -1;
+            //  for (int k = 2; k < c.size(); k++)
+            //  {
+            //      if (value(c[k]) != l_False)
+            //      {
+            //          if (decisionLevel()>assumptions.size())
+            //          {
+            //              choosenPos = k;
+            //              break;
+            //          }
+            //          else
+            //          {
+            //              choosenPos = k;
+
+            //              if (value(c[k]) == l_True || !isSelector(var(c[k]))) {
+            //                  break;
+            //              }
+            //          }
+
+            //      }
+            //  }
+            //  if (choosenPos != -1)
+            //  {
+            //      // watcher i is abandonned using i++, because cr watches now ~c[k] instead of p
+            //      // the blocker is first in the watcher. However,
+            //      // the blocker in the corresponding watcher in ~first is not c[1]
+            //      Watcher w = Watcher(cr, first); i++;
+            //      c[1] = c[choosenPos]; c[choosenPos] = false_lit;
+            //      watches[~c[1]].push(w);
+            //      goto NextClause;
+            //  }
+            //}
             else { // ----------------- DEFAULT  MODE (NOT INCREMENTAL)
                 for (int k = 2; k < c.size(); k++) {
 
@@ -299,6 +344,8 @@ void Solver::simplifyLearnt(Clause &c) {
     vec<Lit> falseLit;
     falseLit.clear();
 
+    // sort(&c[0], c.size(), VarOrderLevelLt(vardata));
+
     bool True_confl = false;
     int beforeSize, afterSize;
     beforeSize = c.size();
@@ -307,6 +354,7 @@ void Solver::simplifyLearnt(Clause &c) {
 
     for (i = 0, j = 0; i < c.size(); i++) {
         if (value(c[i]) == l_Undef) {
+            // printf("///@@@ uncheckedEnqueue:index = %d. l_Undef\n", i);
             simpleUncheckEnqueue(~c[i]);
             c[j++] = c[i];
             confl = simplePropagate();
@@ -315,17 +363,20 @@ void Solver::simplifyLearnt(Clause &c) {
             }
         } else {
             if (value(c[i]) == l_True) {
+                // printf("///@@@ uncheckedEnqueue:index = %d. l_True\n", i);
                 c[j++] = c[i];
                 True_confl = true;
                 confl = reason(var(c[i]));
                 break;
             } else {
+                // printf("///@@@ uncheckedEnqueue:index = %d. l_False\n", i);
                 falseLit.push(c[i]);
             }
         }
     }
     c.shrink(c.size() - j);
     afterSize = c.size();
+    // printf("\nbefore : %d, after : %d ", beforeSize, afterSize);
 
     if (confl != CRef_Undef || True_confl == true) {
         simp_learnt_clause.clear();
@@ -345,6 +396,7 @@ void Solver::simplifyLearnt(Clause &c) {
 
     cancelUntilTrailRecord();
 
+    ////
     simplified_length_record += c.size();
 }
 
@@ -355,7 +407,10 @@ bool Solver::simplifyLearnt_x(vec<CRef> &learnts_x) {
     int ci, cj, li, lj;
     bool sat, false_lit;
     unsigned int nblevels;
+    ////
+    // printf("learnts_x size : %d\n", learnts_x.size());
 
+    ////
     int nbSimplified = 0;
     int nbSimplifing = 0;
 
@@ -367,9 +422,10 @@ bool Solver::simplifyLearnt_x(vec<CRef> &learnts_x) {
             continue;
         else if (c.simplified()) {
             learnts_x[cj++] = learnts_x[ci];
-
+            ////
             nbSimplified++;
         } else {
+            ////
             nbSimplifing++;
             sat = false_lit = false;
             for (int i = 0; i < c.size(); i++) {
@@ -419,14 +475,18 @@ bool Solver::simplifyLearnt_x(vec<CRef> &learnts_x) {
 
                     nblevels = computeLBD(c);
                     if (nblevels < c.lbd()) {
+                        // printf("lbd-before: %d, lbd-after: %d\n", c.lbd(), nblevels);
                         c.set_lbd(nblevels);
                     }
                     if (c.mark() != CORE) {
                         if (c.lbd() <= core_lbd_cut) {
+                            // if (c.mark() == LOCAL) local_learnts_dirty = true;
+                            // else tier2_learnts_dirty = true;
                             cj--;
                             learnts_core.push(cr);
                             c.mark(CORE);
                         } else if (c.mark() == LOCAL && c.lbd() <= 6) {
+                            // local_learnts_dirty = true;
                             cj--;
                             learnts_tier2.push(cr);
                             c.mark(TIER2);
@@ -440,6 +500,9 @@ bool Solver::simplifyLearnt_x(vec<CRef> &learnts_x) {
     }
     learnts_x.shrink(ci - cj);
 
+    //   printf("c nbLearnts_x %d / %d, nbSimplified: %d, nbSimplifing: %d\n",
+    //          learnts_x_size_before, learnts_x.size(), nbSimplified, nbSimplifing);
+
     return true;
 }
 
@@ -450,7 +513,10 @@ bool Solver::simplifyLearnt_core() {
     int ci, cj, li, lj;
     bool sat, false_lit;
     unsigned int nblevels;
+    ////
+    // printf("learnts_x size : %d\n", learnts_x.size());
 
+    ////
     int nbSimplified = 0;
     int nbSimplifing = 0;
 
@@ -462,11 +528,14 @@ bool Solver::simplifyLearnt_core() {
             continue;
         else if (c.simplified()) {
             learnts_core[cj++] = learnts_core[ci];
-
+            ////
             nbSimplified++;
         } else {
             int saved_size = c.size();
-
+            //         if (drup_file){
+            //                 add_oc.clear();
+            //                 for (int i = 0; i < c.size(); i++) add_oc.push(c[i]); }
+            ////
             nbSimplifing++;
             sat = false_lit = false;
             for (int i = 0; i < c.size(); i++) {
@@ -514,6 +583,8 @@ bool Solver::simplifyLearnt_core() {
 #endif
                 }
 
+                // printf("beforeSize: %2d, afterSize: %2d\n", beforeSize, afterSize);
+
                 if (c.size() == 1) {
                     // when unit clause occur, enqueue and propagate
                     uncheckedEnqueue(c[0]);
@@ -524,12 +595,21 @@ bool Solver::simplifyLearnt_core() {
                     // delete the clause memory in logic
                     c.mark(1);
                     ca.free(cr);
+                    //#ifdef BIN_DRUP
+                    //                    binDRUP('d', c, drup_file);
+                    //#else
+                    //                    fprintf(drup_file, "d ");
+                    //                    for (int i = 0; i < c.size(); i++)
+                    //                        fprintf(drup_file, "%i ", (var(c[i]) + 1) * (-2 * sign(c[i]) + 1));
+                    //                    fprintf(drup_file, "0\n");
+                    //#endif
                 } else {
                     attachClause(cr);
                     learnts_core[cj++] = learnts_core[ci];
 
                     nblevels = computeLBD(c);
                     if (nblevels < c.lbd()) {
+                        // printf("lbd-before: %d, lbd-after: %d\n", c.lbd(), nblevels);
                         c.set_lbd(nblevels);
                     }
 
@@ -539,6 +619,9 @@ bool Solver::simplifyLearnt_core() {
         }
     }
     learnts_core.shrink(ci - cj);
+
+    //    printf("c nbLearnts_core %d / %d, nbSimplified: %d, nbSimplifing: %d\n",
+    //           learnts_core_size_before, learnts_core.size(), nbSimplified, nbSimplifing);
 
     return true;
 }
@@ -588,7 +671,10 @@ bool Solver::simplifyLearnt_tier2() {
     int ci, cj, li, lj;
     bool sat, false_lit;
     unsigned int nblevels;
+    ////
+    // printf("learnts_x size : %d\n", learnts_x.size());
 
+    ////
     int nbSimplified = 0;
     int nbSimplifing = 0;
 
@@ -600,10 +686,14 @@ bool Solver::simplifyLearnt_tier2() {
             continue;
         else if (c.simplified()) {
             learnts_tier2[cj++] = learnts_tier2[ci];
+            ////
             nbSimplified++;
         } else {
             int saved_size = c.size();
-
+            //            if (drup_file){
+            //                    add_oc.clear();
+            //                    for (int i = 0; i < c.size(); i++) add_oc.push(c[i]); }
+            ////
             nbSimplifing++;
             sat = false_lit = false;
             for (int i = 0; i < c.size(); i++) {
@@ -652,6 +742,8 @@ bool Solver::simplifyLearnt_tier2() {
 #endif
                 }
 
+                // printf("beforeSize: %2d, afterSize: %2d\n", beforeSize, afterSize);
+
                 if (c.size() == 1) {
                     // when unit clause occur, enqueue and propagate
                     uncheckedEnqueue(c[0]);
@@ -662,10 +754,19 @@ bool Solver::simplifyLearnt_tier2() {
                     // delete the clause memory in logic
                     c.mark(1);
                     ca.free(cr);
+                    //#ifdef BIN_DRUP
+                    //                    binDRUP('d', c, drup_file);
+                    //#else
+                    //                    fprintf(drup_file, "d ");
+                    //                    for (int i = 0; i < c.size(); i++)
+                    //                        fprintf(drup_file, "%i ", (var(c[i]) + 1) * (-2 * sign(c[i]) + 1));
+                    //                    fprintf(drup_file, "0\n");
+                    //#endif
                 } else {
 
                     nblevels = computeLBD(c);
                     if (nblevels < c.lbd()) {
+                        // printf("lbd-before: %d, lbd-after: %d\n", c.lbd(), nblevels);
                         c.set_lbd(nblevels);
                     }
                     // duplicate learnts
@@ -685,6 +786,7 @@ bool Solver::simplifyLearnt_tier2() {
                             duplicates_added_minimization++;
                         }
                         if ((c.lbd() <= core_lbd_cut) || (id == min_number_of_learnts_copies + 1)) {
+                            // if (id == min_number_of_learnts_copies+1){
                             cj--;
                             learnts_core.push(cr);
                             c.mark(CORE);
@@ -698,22 +800,35 @@ bool Solver::simplifyLearnt_tier2() {
     }
     learnts_tier2.shrink(ci - cj);
 
+    //    printf("c nbLearnts_tier2 %d / %d, nbSimplified: %d, nbSimplifing: %d\n",
+    //           learnts_tier2_size_before, learnts_tier2.size(), nbSimplified, nbSimplifing);
+
     return true;
 }
 
 bool Solver::simplifyAll() {
-
+    ////
     simplified_length_record = original_length_record = 0;
 
     if (!ok || propagate() != CRef_Undef)
         return ok = false;
 
+    //// cleanLearnts(also can delete these code), here just for analyzing
+    // if (local_learnts_dirty) cleanLearnts(learnts_local, LOCAL);
+    // if (tier2_learnts_dirty) cleanLearnts(learnts_tier2, TIER2);
+    // local_learnts_dirty = tier2_learnts_dirty = false;
+
     if (!simplifyLearnt_core())
         return ok = false;
     if (!simplifyLearnt_tier2())
         return ok = false;
+    // if (!simplifyLearnt_x(learnts_local)) return ok = false;
 
     checkGarbage();
+
+    ////
+    //  printf("c size_reduce_ratio     : %4.2f%%\n",
+    //         original_length_record == 0 ? 0 : (original_length_record - simplified_length_record) * 100 / (double)original_length_record);
 
     return true;
 }
@@ -733,6 +848,8 @@ Var Solver::newVar(bool sign, bool dvar) {
     vardata.push(mkVarData(CRef_Undef, 0));
     activity_CHB.push(0);
     activity_VSIDS.push(rnd_init_act ? drand(random_seed) * 0.00001 : 0);
+    activity_lit.push(0);
+    activity_lit.push(0);
 
     picked.push(0);
     conflicted.push(0);
@@ -798,9 +915,7 @@ bool Solver::addClause_(vec<Lit> &ps) {
         return ok = false;
     else if (ps.size() == 1) {
         uncheckedEnqueue(ps[0]);
-        if (!render) {
-            return ok = (propagate() == CRef_Undef);
-        }
+        return ok = (propagate() == CRef_Undef);
     } else {
         CRef cr = ca.alloc(ps, false);
         clauses.push(cr);
@@ -913,8 +1028,10 @@ void Solver::cancelUntil(int bLevel) {
 #ifdef PRINT_OUT
                 std::cout << "undo " << x << "\n";
 #endif
-                if (phase_saving > 1 || ((phase_saving == 1) && c > trail_lim.last()))
+                if (phase_saving > 1 || (phase_saving == 1) && c > trail_lim.last()) {
                     polarity[x] = sign(trail[c]);
+                    litBumpActivity(mkLit(x, !polarity[x]), lsids_erase_bump_weight);
+                }
                 insertVarOrder(x);
             }
         }
@@ -934,8 +1051,14 @@ void Solver::cancelUntil(int bLevel) {
 
 Lit Solver::pickBranchLit() {
     Var next = var_Undef;
-
+    //    Heap<VarOrderLt>& order_heap = VSIDS ? order_heap_VSIDS : order_heap_CHB;
     Heap<VarOrderLt> &order_heap = DISTANCE ? order_heap_distance : ((!VSIDS) ? order_heap_CHB : order_heap_VSIDS);
+
+    // Random decision:
+    /*if (drand(random_seed) < random_var_freq && !order_heap.empty()){
+        next = order_heap[irand(random_seed,order_heap.size())];
+        if (value(next) == l_Undef && decision[next])
+            rnd_decisions++; }*/
 
     // Activity based decision:
     while (next == var_Undef || value(next) != l_Undef || !decision[next])
@@ -960,25 +1083,27 @@ Lit Solver::pickBranchLit() {
             next = order_heap.removeMin();
         }
 
-    if (boost && assigns[trail.size()] == l_Undef) {
-        polarity[trail.size()] = !polarity[trail.size()];
-    }
-    if (trail.size() > global) {
-        global = trail.size();
-        if (global > cursor) {
-            cursor = global;
-            if (log) {
-#ifdef MASSIVE
-                printf("c %.4f%% |%i| %i\n", 100.0 * (nVars() - cursor) / nVars(), rank, nVars() - cursor);
-#else
-                printf("\rc %.4f%% %i     ", 100.0 * (nVars() - cursor) / nVars(), nVars() - cursor);
-#endif
-                fflush(stdout);
-            }
-        }
-    } else if (trail.size() < global) {
-        if (assigns[trail.size()] == l_Undef) {
+    if (!VSIDS) {
+        if (boost) {
             polarity[trail.size()] = !polarity[trail.size()];
+        }
+        if (trail.size() > global) {
+            global = trail.size();
+            if (global > cursor) {
+                cursor = global;
+                if (log) {
+#ifdef MASSIVE
+                    printf("\rc %.2f%% [%i]       ", 100.0 * (nVars() - global) / nVars(), rank);
+#else
+                    printf("\rc %.2f%%            ", 100.0 * (nVars() - global) / nVars());
+#endif
+                    fflush(stdout);
+                }
+            }
+        } else if (trail.size() < global) {
+            if (boost) {
+                polarity[trail.size()] = !polarity[trail.size()];
+            }
         }
     }
 
@@ -1011,6 +1136,7 @@ inline Solver::ConflictData Solver::FindConflictLevel(CRef cind) {
         std::swap(conflCls[0], conflCls[highestId]);
         if (highestId > 1) {
             OccLists<Lit, vec<Watcher>, WatcherDeleted> &ws = conflCls.size() == 2 ? watches_bin : watches;
+            // ws.smudge(~conflCls[highestId]);
             remove(ws[~conflCls[highestId]], Watcher(cind, conflCls[1]));
             ws[~conflCls[0]].push(Watcher(cind, conflCls[1]));
         }
@@ -1088,6 +1214,7 @@ void Solver::analyze(CRef confl, vec<Lit> &out_learnt, int &out_btlevel, int &ou
             if (!seen[var(q)] && level(var(q)) > 0) {
                 if (VSIDS) {
                     varBumpActivity(var(q), .5);
+                    litBumpActivity(~q, .5);
                     add_tmp.push(q);
                 } else
                     conflicted[var(q)]++;
@@ -1175,9 +1302,18 @@ void Solver::analyze(CRef confl, vec<Lit> &out_learnt, int &out_btlevel, int &ou
             Var v = var(add_tmp[i]);
             if (level(v) >= out_btlevel - 1)
                 varBumpActivity(v, 1);
+            litBumpActivity(~add_tmp[i], 1);
         }
         add_tmp.clear();
     } else {
+        for (int i = 0; i < add_tmp.size(); i++) {
+            Var v = var(add_tmp[i]);
+            if (level(v) >= out_btlevel - 1) {
+                litBumpActivity(~add_tmp[i], 1);
+            }
+        }
+        add_tmp.clear();
+
         seen[var(p)] = true;
         for (int i = out_learnt.size() - 1; i >= 0; i--) {
             Var v = var(out_learnt[i]);
@@ -1479,17 +1615,15 @@ void Solver::reduceDB() {
     int limit = learnts_local.size() / 2;
     for (i = j = 0; i < learnts_local.size(); i++) {
         Clause &c = ca[learnts_local[i]];
-        if (c.mark() == LOCAL) {
-            if (c.removable() && !locked(c) && i < limit) {
+        if (c.mark() == LOCAL)
+            if (c.removable() && !locked(c) && i < limit)
                 removeClause(learnts_local[i]);
-            } else {
-                if (!c.removable()) {
+            else {
+                if (!c.removable())
                     limit++;
-                }
                 c.removable(true);
                 learnts_local[j++] = learnts_local[i];
             }
-        }
     }
     learnts_local.shrink(i - j);
 
@@ -1499,17 +1633,15 @@ void Solver::reduceDB_Tier2() {
     int i, j;
     for (i = j = 0; i < learnts_tier2.size(); i++) {
         Clause &c = ca[learnts_tier2[i]];
-        if (c.mark() == TIER2) {
+        if (c.mark() == TIER2)
             if (!locked(c) && c.touched() + 30000 < conflicts) {
                 learnts_local.push(learnts_tier2[i]);
                 c.mark(LOCAL);
                 // c.removable(true);
                 c.activity() = 0;
                 claBumpActivity(c);
-            } else {
+            } else
                 learnts_tier2[j++] = learnts_tier2[i];
-            }
-        }
     }
     learnts_tier2.shrink(i - j);
 }
@@ -1530,13 +1662,11 @@ void Solver::safeRemoveSatisfied(vec<CRef> &cs, unsigned valid_mark) {
     int i, j;
     for (i = j = 0; i < cs.size(); i++) {
         Clause &c = ca[cs[i]];
-        if (c.mark() == valid_mark) {
-            if (satisfied(c)) {
+        if (c.mark() == valid_mark)
+            if (satisfied(c))
                 removeClause(cs[i]);
-            } else {
+            else
                 cs[j++] = cs[i];
-            }
-        }
     }
     cs.shrink(i - j);
 }
@@ -1661,7 +1791,8 @@ bool Solver::collectFirstUIP(CRef confl) {
 
     for (int i = 0; i < involved_lits.size(); i++) {
         Var v = var(involved_lits[i]);
-
+        //        double old_act=activity_distance[v];
+        //        activity_distance[v] +=var_iLevel_inc * var_iLevel_tmp[v];
         activity_distance[v] += var_iLevel_tmp[v] * level_incs[var_iLevel_tmp[v] - 1];
 
         if (activity_distance[v] > 1e100) {
@@ -1673,11 +1804,37 @@ bool Solver::collectFirstUIP(CRef confl) {
         }
         if (order_heap_distance.inHeap(v))
             order_heap_distance.decrease(v);
+
+        //        var_iLevel_inc *= (1 / my_var_decay);
     }
     var_iLevel_inc = level_incs[level_incs.size() - 1];
     return true;
 }
 
+struct UIPOrderByILevel_Lt {
+    Solver &solver;
+    const vec<double> &var_iLevel;
+    bool operator()(Lit x, Lit y) const { return var_iLevel[var(x)] < var_iLevel[var(y)] || (var_iLevel[var(x)] == var_iLevel[var(y)] && solver.level(var(x)) > solver.level(var(y))); }
+    UIPOrderByILevel_Lt(const vec<double> &iLevel, Solver &para_solver) : solver(para_solver), var_iLevel(iLevel) {}
+};
+
+CRef Solver::propagateLits(vec<Lit> &lits) {
+    Lit lit;
+    int i;
+
+    for (i = lits.size() - 1; i >= 0; i--) {
+        lit = lits[i];
+        if (value(lit) == l_Undef) {
+            newDecisionLevel();
+            uncheckedEnqueue(lit);
+            CRef confl = propagate();
+            if (confl != CRef_Undef) {
+                return confl;
+            }
+        }
+    }
+    return CRef_Undef;
+}
 /*_________________________________________________________________________________________________
 |
 |  search : (nof_conflicts : int) (params : const SearchParams&)  ->  [lbool]
@@ -1691,6 +1848,69 @@ bool Solver::collectFirstUIP(CRef confl) {
 |    if the clause set is unsatisfiable. 'l_Undef' if the bound on number of conflicts is reached.
 |________________________________________________________________________________________________@*/
 
+void Solver::info_based_rephase() {
+    int var_nums = nVars();
+    for (int i = 0; i < var_nums; ++i)
+        polarity[i] = !ls_mediation_soln[i];
+    if (!DISTANCE) {
+        for (int i = 0; i < var_nums; ++i) {
+            if (ccnr.conflict_ct[i + 1] > 0) {
+                if (VSIDS) {
+                    varBumpActivity(i, ccnr.conflict_ct[i + 1] * 100 / ccnr._step);
+                } else {
+                    conflicted[i] += max((long long int)1, ccnr.conflict_ct[i + 1] * 100 / ccnr._step);
+                }
+            }
+        }
+    }
+}
+
+void Solver::rand_based_rephase() {
+    int var_nums = nVars();
+    int pick_rand = rand() % 1000;
+
+    // local search
+    if ((pick_rand -= 100) < 0) {
+        for (int i = 0; i < var_nums; ++i)
+            polarity[i] = !ls_best_soln[i];
+    } else if ((pick_rand -= 300) < 0) {
+        for (int i = 0; i < var_nums; ++i)
+            polarity[i] = !ls_mediation_soln[i];
+        mediation_used = true;
+    }
+    // top_trail 200
+    else if ((pick_rand -= 300) < 0) {
+        for (int i = 0; i < var_nums; ++i)
+            polarity[i] = !top_trail_soln[i];
+    }
+    // reverse
+    else if ((pick_rand -= 50) < 0) {
+        for (int i = 0; i < var_nums; ++i)
+            polarity[i] = !polarity[i];
+    } else if ((pick_rand -= 25) < 0) {
+        for (int i = 0; i < var_nums; ++i)
+            polarity[i] = ls_best_soln[i];
+    } else if ((pick_rand -= 25) < 0) {
+        for (int i = 0; i < var_nums; ++i)
+            polarity[i] = top_trail_soln[i];
+    }
+    // 150
+    else if ((pick_rand -= 140) < 0) {
+        for (int i = 0; i < var_nums; ++i)
+            polarity[i] = rand() % 2 == 0 ? 1 : 0;
+    } else if ((pick_rand -= 5) < 0) {
+        for (int i = 0; i < var_nums; ++i)
+            polarity[i] = 1;
+    } else if ((pick_rand -= 5) < 0) {
+        for (int i = 0; i < var_nums; ++i)
+            polarity[i] = 0;
+    }
+    // 50
+    else {
+        // do nothing
+    }
+}
+
 lbool Solver::search(int &nof_conflicts) {
     assert(ok);
     int backtrack_level;
@@ -1701,10 +1921,25 @@ lbool Solver::search(int &nof_conflicts) {
 
     freeze_ls_restart_num--;
     bool can_call_ls = true;
+    // double  search_start_cpu_time = cpuTime();
+
+    // if(starts % rephase_mod == 0 && search_start_cpu_time > state_change_time){
+    //     rand_based_rephase();
+    // }
+    if (starts > state_change_time) {
+        if (rand() % 100 < 50)
+            info_based_rephase();
+        else
+            rand_based_rephase();
+    }
 
     // simplify
     //
     if (conflicts >= curSimplify * nbconfbeforesimplify) {
+        //        printf("c ### simplifyAll on conflict : %lld\n", conflicts);
+        // printf("nbClauses: %d, nbLearnts_core: %d, nbLearnts_tier2: %d, nbLearnts_local: %d, nbLearnts: %d\n",
+        //  clauses.size(), learnts_core.size(), learnts_tier2.size(), learnts_local.size(),
+        //  learnts_core.size() + learnts_tier2.size() + learnts_local.size());
         nbSimplifyAll++;
         if (!simplifyAll()) {
             return l_False;
@@ -1714,6 +1949,104 @@ lbool Solver::search(int &nof_conflicts) {
     }
 
     for (;;) {
+#ifdef MASSIVE_COOPERATIVE
+        /* Here add MPI_Probe and after getting the shared_clause do:
+         *
+         * CRef cr = ca.alloc(shared_clause, true);
+         * learnts_local.push(cr);
+         * attachClause(cr);
+         * claBumpActivity(ca[cr]);
+         *
+         * */
+        int flag = 1; //, p = 0;//, flag1 = 0;
+        do {
+            flag = 0; //, flag1 = 0;
+            for (int r = 0; r < size; r++) {
+                if (r != rank) {
+                    MPI_Status my_status;
+                    MPI_Iprobe(/*MPI_ANY_SOURCE */ rank, MPI_ANY_TAG, MPI_COMM_WORLD, &flag, &my_status);
+                    if (flag) {
+                        MPI_Request recv_request;
+                        MPI_Status recv_status;
+                        int recv_buffer_len;
+                        MPI_Get_count(&my_status, MPI_INT, &recv_buffer_len);
+                        int recv_buffer[recv_buffer_len];
+                        MPI_Irecv(recv_buffer, recv_buffer_len, MPI_INT, my_status.MPI_SOURCE, my_status.MPI_TAG, MPI_COMM_WORLD, &recv_request);
+                        MPI_Wait(&recv_request, &recv_status);
+                        vec<Lit> shared_clause;
+                        std::set<int> lbds;
+                        int undef_count = 0;
+                        int max_lvl = 0, lvl;
+                        bool isSatisfied = false;
+                        for (int i = 0; i < recv_buffer_len; ++i) {
+                            shared_clause.push(toLit(recv_buffer[i]));
+                            if (value(shared_clause[i]) != l_Undef) {
+                                lvl = level(var(shared_clause[i]));
+                                lbds.insert(lvl);
+                                if (lvl > max_lvl)
+                                    max_lvl = lvl;
+                                if (value(shared_clause[i]) == l_True) {
+                                    isSatisfied = true;
+                                }
+                            } else {
+                                undef_count++;
+                                vardata[var(shared_clause[i])].level = 0;
+                                vardata[var(shared_clause[i])].reason = CRef_Undef;
+                            }
+                        }
+                        bool is_all_undef = true;
+                        for (int j = 0; j < 2; ++j) {
+                            int max_level = -1;
+                            int indx = j;
+                            for (int k = j; k < recv_buffer_len; ++k) {
+                                if (/*value(shared_clause[k]) != l_Undef && */ level(var(shared_clause[k])) > max_level) {
+                                    max_level = level(var(shared_clause[k]));
+                                    indx = k;
+                                    is_all_undef = false;
+                                }
+                            }
+                            Lit temp = shared_clause[j];
+                            shared_clause[j] = shared_clause[indx];
+                            shared_clause[indx] = temp;
+                        }
+                        CRef cr;
+                        bool ifAdded = false;
+                        if (undef_count > 0)
+                            undef_count = 1;
+                        assert(shared_clause.size() > 1);
+                        int id = 0;
+                        if (lbd <= max_lbd_dup) {
+                            std::vector<uint32_t> tmp;
+                            for (int i = 0; i < learnt_clause.size(); i++)
+                                tmp.push_back(learnt_clause[i].x);
+                            id = is_duplicate(tmp);
+                            if (id == min_number_of_learnts_copies + 1) {
+                                duplicates_added_conflicts++;
+                            }
+                            if (id == min_number_of_learnts_copies) {
+                                duplicates_added_tier2++;
+                            }
+                        }
+                        // duplicate learnts
+                        if ((lbd <= core_lbd_cut) || (id == min_number_of_learnts_copies + 1)) {
+                            learnts_core.push(cr);
+                            ca[cr].mark(CORE);
+                        } else if ((lbd <= 6) || (id == min_number_of_learnts_copies)) {
+                            learnts_tier2.push(cr);
+                            ca[cr].mark(TIER2);
+                            ca[cr].touched() = conflicts;
+                        } else {
+                            learnts_local.push(cr);
+                            claBumpActivity(ca[cr]);
+                        }
+                        attachClause(cr);
+                        ifAdded = true;
+                    }
+                }
+            }
+        } while (flag);
+
+#endif
         CRef confl = propagate();
 
         if (confl != CRef_Undef) {
@@ -1726,7 +2059,7 @@ lbool Solver::search(int &nof_conflicts) {
 
             conflicts++;
             nof_conflicts--;
-
+            // if (conflicts == 100000 && learnts_core.size() < 100) core_lbd_cut = 5;
             ConflictData data = FindConflictLevel(confl);
             if (data.nHighestLevel == 0)
                 return l_False;
@@ -1744,6 +2077,33 @@ lbool Solver::search(int &nof_conflicts) {
                 collectFirstUIP(confl);
 
             analyze(confl, learnt_clause, backtrack_level, lbd);
+
+#ifdef MASSIVE_COOPERATIVE
+
+            /* Here add the sharing information for the learnt_clause recently discovered
+             * Use of MPI_isend to all the other processes to send the learnt_clause(can not use MPI_Bcast as MPI_probe is
+             * a point to point communication standard)
+             * learnt_clause is a vec<Lits>
+             * Use Lit:toInt(Lit p) to convert a literal into integer and retrive back using Lit::toLit(int i) method
+             *
+             * */
+            int buffer_len = learnt_clause.size();
+            if (buffer_len <= 8 && learnt_clause.size() > 1) {
+                int send_buffer[buffer_len];
+                MPI_Request my_request[size - 1];
+                for (int i = 0; i < buffer_len; i++) {
+                    send_buffer[i] = toInt(learnt_clause[i]);
+                }
+
+                for (int i = 0, j = 0; i < size; i++) {
+                    if (i != rank) {
+                        MPI_Isend(send_buffer, buffer_len, MPI_INT, i, i, MPI_COMM_WORLD, &my_request[j++]);
+                    }
+                }
+                MPI_Waitall(size - 1, my_request, MPI_STATUS_IGNORE);
+            }
+#endif
+
             // check chrono backtrack condition
             if ((confl_to_chrono < 0 || confl_to_chrono <= conflicts) && chrono > -1 && (decisionLevel() - backtrack_level) >= chrono) {
                 ++chrono_backtrack;
@@ -1824,26 +2184,42 @@ lbool Solver::search(int &nof_conflicts) {
                 if (verbosity >= 1)
                     printf("c | %9d | %7d %8d %8d | %8d %8d %6.0f | %6.3f %% |\n", (int)conflicts, (int)dec_vars - (trail_lim.size() == 0 ? trail.size() : trail_lim[0]), nClauses(), (int)clauses_literals, (int)max_learnts, nLearnts(), (double)learnts_literals / nLearnts(), progressEstimate() * 100);
             }
-            if (boost && assigns[trail.size()] == l_Undef) {
-                polarity[trail.size()] = !polarity[trail.size()];
-            }
-            if (trail.size() > global) {
-                global = trail.size();
-                if (global > cursor) {
-                    cursor = global;
-                    if (log) {
-#ifdef MASSIVE
-                        printf("c %.4f%% |%i| %i\n", 100.0 * (nVars() - cursor) / nVars(), rank, nVars() - cursor);
 
-#else
-                        printf("\rc %.4f%% %i     ", 100.0 * (nVars() - cursor) / nVars(), nVars() - cursor);
-#endif
-                        fflush(stdout);
+            // the top_trail_soln should be update after each conflict
+            if (trail.size() > max_trail) {
+                max_trail = trail.size();
+
+                int var_nums = nVars();
+                for (int idx_i = 0; idx_i < var_nums; ++idx_i) {
+                    lbool value_i = value(idx_i);
+                    if (value_i == l_Undef)
+                        top_trail_soln[idx_i] = !polarity[idx_i];
+                    else {
+                        top_trail_soln[idx_i] = value_i == l_True ? 1 : 0;
                     }
                 }
-            } else if (trail.size() < global) {
-                if (assigns[trail.size()] == l_Undef) {
-                    polarity[trail.size()] = !polarity[trail.size()];
+            }
+            if (boost) {
+                polarity[trail.size()] = !polarity[trail.size()];
+            }
+            if (VSIDS) {
+                if (trail.size() > global) {
+                    global = trail.size();
+                    if (global > cursor) {
+                        cursor = global;
+                        if (log) {
+#ifdef MASSIVE
+                            printf("\rc %.2f%% [%i]       ", 100.0 * (nVars() - global) / nVars(), rank);
+#else
+                            printf("\rc %.2f%%            ", 100.0 * (nVars() - global) / nVars());
+#endif
+                            fflush(stdout);
+                        }
+                    } else if (trail.size() < global) {
+                        if (boost) {
+                            polarity[trail.size()] = !polarity[trail.size()];
+                        }
+                    }
                 }
             }
         } else {
@@ -1857,8 +2233,32 @@ lbool Solver::search(int &nof_conflicts) {
                     can_call_ls = false;
                     mediation_used = false;
                     freeze_ls_restart_num = restarts_gap;
+                    bool res = call_ls(true);
+
+                    if (res) {
+                        solved_by_ls = true;
+                        return l_True;
+                    }
                 }
             }
+            // else{
+
+            //     if( can_call_ls && freeze_ls_restart_num < 1 && mediation_used   \
+            //         && trail.size() > (int)conflict_ratio * nVars()  \
+            //         && up_time_ratio * search_start_cpu_time > ls_used_time ){
+
+            //         can_call_ls     = false;
+            //         mediation_used  = false;
+            //         freeze_ls_restart_num = restarts_gap;
+            //         bool res = call_ls(false);
+
+            //         if(res){
+            //             solved_by_ls = true;
+            //             return l_True;
+            //         }
+            //     }
+
+            // }
 
             bool restart = false;
             if (!VSIDS)
@@ -1890,14 +2290,31 @@ lbool Solver::search(int &nof_conflicts) {
             }
 
             Lit next = lit_Undef;
+            /*while (decisionLevel() < assumptions.size()){
+                // Perform user provided assumption:
+                Lit p = assumptions[decisionLevel()];
+                if (value(p) == l_True){
+                    // Dummy decision level:
+                    newDecisionLevel();
+                }else if (value(p) == l_False){
+                    analyzeFinal(~p, conflict);
+                    return l_False;
+                }else{
+                    next = p;
+                    break;
+                }
+            }
 
-            // New variable decision:
-            decisions++;
-            next = pickBranchLit();
+            if (next == lit_Undef)*/
+            {
+                // New variable decision:
+                decisions++;
+                next = pickBranchLit();
 
-            if (next == lit_Undef)
-                // Model found:
-                return l_True;
+                if (next == lit_Undef)
+                    // Model found:
+                    return l_True;
+            }
 
             // Increase decision level and enqueue 'next'
             newDecisionLevel();
@@ -1951,18 +2368,157 @@ static double luby(double y, int x) {
     return pow(y, seq);
 }
 
+int Solver::oracle(int glb) {
+    int falses = nClauses() + nLearnts();
+    for (int i = 0; i < clauses.size(); i++) {
+        falses -= satisfied(ca[clauses[i]]);
+    }
+    for (int i = 0; i < learnts_core.size(); i++) {
+        falses -= satisfied(ca[learnts_core[i]]);
+    }
+    for (int i = 0; i < learnts_tier2.size(); i++) {
+        falses -= satisfied(ca[learnts_tier2[i]]);
+    }
+    for (int i = 0; i < learnts_local.size(); i++) {
+        falses -= satisfied(ca[learnts_local[i]]);
+    }
+    return falses;
+}
+
+lbool Solver::neg(lbool x) {
+    if (x == l_Undef) {
+        return conflicts % 2 ? l_False : l_True;
+    } else {
+        return x == l_False ? l_True : l_False;
+    }
+}
+
+lbool Solver::hess_second_order() {
+    int loc, glb = INT32_MAX;
+    assigns.copyTo(aux);
+    for (int i = 0; i < nVars(); i++) {
+        assigns[i] = neg(neg(assigns[i]));
+    }
+    for (;;) {
+        bool done = true;
+        for (int k = 0; k < nVars() * nVars(); k++) {
+            int i = k / nVars();
+            int j = k % nVars();
+            if (i == j) {
+                assigns[i] = neg(assigns[j]);
+            } else {
+                lbool tmp = assigns[i];
+                assigns[i] = neg(assigns[j]);
+                assigns[j] = tmp;
+            }
+            loc = oracle(glb);
+            if (loc < glb) {
+                glb = loc;
+                if (glb < hess_cursor) {
+                    hess_cursor = glb;
+                    if (log) {
+#ifdef MASSIVE
+                        printf("c %.2f%% [%i] (**) \n", 100.0 * glb / (nClauses() + nLearnts()), rank);
+#else
+                        printf("\rc %.2f%% (**)       ", 100.0 * glb / (nClauses() + nLearnts()));
+#endif
+                        fflush(stdout);
+                    }
+                    if (glb == 0) {
+                        solved_by_hess = true;
+                        return l_True;
+                    }
+                    done = false;
+                }
+            } else if (loc > glb) {
+                if (i == j) {
+                    assigns[i] = neg(assigns[j]);
+                } else {
+                    lbool tmp = assigns[i];
+                    assigns[i] = neg(assigns[j]);
+                    assigns[j] = tmp;
+                }
+            }
+        }
+        if (done) {
+            break;
+        }
+    }
+    aux.copyTo(assigns);
+    cancelUntil(0);
+    return l_Undef;
+}
+
+lbool Solver::hess_first_order() {
+    int loc, glb = INT32_MAX;
+    assigns.copyTo(aux);
+    for (int i = 0; i < nVars(); i++) {
+        assigns[i] = neg(neg(assigns[i]));
+    }
+    for (;;) {
+        bool done = true;
+        for (int i = 0; i < nVars(); i++) {
+            // if (assigns[i] == l_Undef) {
+            assigns[i] = neg(assigns[i]);
+            loc = oracle(glb);
+            if (loc < glb) {
+                glb = loc;
+                if (glb < hess_cursor) {
+                    hess_cursor = glb;
+                    if (log) {
+#ifdef MASSIVE
+                        printf("c %.2f%% [%i] (*) \n", 100.0 * glb / (nClauses() + nLearnts()), rank);
+#else
+                        printf("\rc %.2f%% (*)        ", 100.0 * glb / (nClauses() + nLearnts()));
+#endif
+                        fflush(stdout);
+                    }
+                    if (glb == 0) {
+                        solved_by_hess = true;
+                        return l_True;
+                    }
+                    done = false;
+                }
+            } else if (loc > glb) {
+                assigns[i] = neg(assigns[i]);
+            }
+            //}
+        }
+        if (done) {
+            break;
+        }
+    }
+    aux.copyTo(assigns);
+    cancelUntil(0);
+    return l_Undef;
+}
+
+void Solver::rand_init() {
+    for (int i = 0; i < nVars(); i++) {
+        polarity[i] = (polarity[i] + rank * rand()) % 2;
+    }
+}
+
 // NOTE: assumptions passed in member-variable 'assumptions'.
 lbool Solver::solve_() {
-    int msec = 0, trigger = 250;
-    clock_t before = clock();
-    boost = false;
-    cursor = 0;
-    lbool status = l_Undef;
-    master = nClauses();
+    // signal(SIGALRM, SIGALRM_switch);
+    // alarm(2500);
+    hess_cursor = INT32_MAX;
+    solved_by_hess = false;
+    solved_by_ls = false;
 
-    std::random_device device;
-    std::default_random_engine engine(device());
-    std::uniform_real_distribution<double> distribution(0, 1);
+    seed = time(NULL) + time(NULL) * rank;
+
+    srand(seed);
+
+#ifdef MASSIVE
+    state_change_time = rand() % 2000; // starts
+    rand_init();
+#endif
+
+    if (massive) {
+        rand_init();
+    }
 
     model.clear();
     conflict.clear();
@@ -1974,6 +2530,11 @@ lbool Solver::solve_() {
     max_learnts = nClauses() * learntsize_factor;
     learntsize_adjust_confl = learntsize_adjust_start_confl;
     learntsize_adjust_cnt = (int)learntsize_adjust_confl;
+    lbool status = l_Undef;
+
+    ls_mediation_soln.resize(nVars());
+    ls_best_soln.resize(nVars());
+    top_trail_soln.resize(nVars());
 
     if (verbosity >= 1) {
         printf("c ============================[ Search Statistics ]==============================\n");
@@ -1984,8 +2545,13 @@ lbool Solver::solve_() {
 
     add_tmp.clear();
 
+    int fls_res = call_ls(false);
+    if (fls_res) {
+        status = l_True;
+    }
+
     VSIDS = true;
-    int init = 250;
+    int init = 10000;
     while (status == l_Undef && init > 0 /*&& withinBudget()*/)
         status = search(init);
     VSIDS = false;
@@ -1996,48 +2562,30 @@ lbool Solver::solve_() {
 
     dupl_db_size = 0;
     size_t dupl_db_size_limit = dupl_db_init_size;
+
+    cursor = 0;
     // Search:
+    uint64_t curr_props = 0;
     int curr_restarts = 0;
     last_switch_conflicts = starts;
-    std::vector<double> linespace(polarity.size());
+#ifdef IPASIR_API
+    while (status == l_Undef && withinBudget()) {
+#else
     while (status == l_Undef) {
-        for (int i = 0; i < polarity.size(); i++) {
-            polarity[i] = std::round(distribution(engine));
-        }
+#endif
+        boost = !boost;
         global = 0;
-        clock_t difference = clock() - before;
-        msec = difference * 1000 / CLOCKS_PER_SEC;
-        if (msec > trigger) {
-            VSIDS = !VSIDS;
-            trigger = 2 * msec + 1;
-            uint32_t removed_duplicates = 0;
-            std::vector<std::vector<uint64_t> > tmp;
-
-            for (auto &outer_mp : ht) {                  // variables
-                for (auto &inner_mp : outer_mp.second) { // sizes
-                    for (auto &in_in_mp : inner_mp.second) {
-                        if (in_in_mp.second >= min_number_of_learnts_copies) {
-                            tmp.push_back({(unsigned long long)outer_mp.first, inner_mp.first, in_in_mp.first, in_in_mp.second});
-                        }
-                    }
-                }
-            }
-
-            removed_duplicates = dupl_db_size - tmp.size();
-            ht.clear();
-            for (auto & i : tmp) {
-                ht[i[0]][i[1]][i[2]] = i[3];
-            }
-            dupl_db_size_limit *= 1.1;
-            dupl_db_size -= removed_duplicates;
-        }
         if (VSIDS) {
-            int weighted = engine();
+            int weighted = INT32_MAX;
             status = search(weighted);
         } else {
             int nof_conflicts = luby(restart_inc, curr_restarts) * restart_first;
             curr_restarts++;
             status = search(nof_conflicts);
+        }
+        if (propagations - curr_props > VSIDS_props_limit) {
+            curr_props = propagations;
+            VSIDS_props_limit = VSIDS_props_limit + VSIDS_props_limit / 10;
         }
         if (starts - last_switch_conflicts > switch_heristic_mod) {
             if (VSIDS) {
@@ -2052,7 +2600,49 @@ lbool Solver::solve_() {
 #endif
             }
             last_switch_conflicts = starts;
+            //            cout<<"c Swith"<<VSIDS<<endl;
+            // printf("\n");
+            // printf("c Duplicate learnts added (Minimization) %i.\n", duplicates_added_minimization);
+            // printf("c Duplicate learnts added (conflicts) %i.\n", duplicates_added_conflicts);
+            // printf("c Duplicate learnts added (tier2) %i.\n", duplicates_added_tier2);
+            // printf("c Duptime: %i\n", duptime.count());
+            // printf("c Number of conflicts: %i\n", conflicts);
+            // printf("c Core size: %i\n", learnts_core.size());
+
+            uint32_t removed_duplicates = 0;
+            std::vector<std::vector<uint64_t> > tmp;
+            // std::map<int32_t,std::map<uint32_t,std::unordered_map<uint64_t,uint32_t>>>  ht;
+            for (auto &outer_mp : ht) {                  // variables
+                for (auto &inner_mp : outer_mp.second) { // sizes
+                    for (auto &in_in_mp : inner_mp.second) {
+                        if (in_in_mp.second >= min_number_of_learnts_copies) {
+                            tmp.push_back({(unsigned long long)outer_mp.first, inner_mp.first, in_in_mp.first, in_in_mp.second});
+                        }
+                    }
+                }
+            }
+            removed_duplicates = dupl_db_size - tmp.size();
+            ht.clear();
+            for (auto &i : tmp) {
+                ht[i[0]][i[1]][i[2]] = i[3];
+            }
+            // ht_old.clear();
+            dupl_db_size_limit *= 1.1;
+            dupl_db_size -= removed_duplicates;
+            // printf("c removed duplicate db entries %i\n", removed_duplicates);
         }
+
+        //         if (!VSIDS && switch_mode){
+        //             VSIDS = true;
+        //             printf("c Switched to VSIDS.\n");
+        //             fflush(stdout);
+        //             picked.clear();
+        //             conflicted.clear();
+        //             almost_conflicted.clear();
+        // #ifdef ANTI_EXPLORATION
+        //             canceled.clear();
+        // #endif
+        //         }
     }
 
     if (verbosity >= 1)
@@ -2066,11 +2656,26 @@ lbool Solver::solve_() {
     if (status == l_True) {
         // Extend & copy model:
         model.growTo(nVars());
-        for (int i = 0; i < nVars(); i++)
-            model[i] = value(i);
+        if (solved_by_ls) {
+            printf("\rc LS!                \n");
+            for (int i = 0; i < nVars(); i++)
+                model[i] = ls_mediation_soln[i] ? l_True : l_False;
+        } else {
+            if (solved_by_hess) {
+                printf("\rc HESS!             \n");
+                for (int i = 0; i < nVars(); i++)
+                    model[i] = assigns[i];
+            } else {
+                printf("\rc SLIME!             \n");
+                for (int i = 0; i < nVars(); i++)
+                    model[i] = value(i);
+            }
+        }
 
-    } else if (status == l_False && conflict.size() == 0)
+    } else if (status == l_False && conflict.size() == 0) {
         ok = false;
+        printf("\rc SLIME!             \n");
+    }
 
     cancelUntil(0);
     return status;
@@ -2158,11 +2763,13 @@ void Solver::toDimacs(FILE *f, const vec<Lit> &assumps) {
 void Solver::relocAll(ClauseAllocator &to) {
     // All watchers:
     //
+    // for (int i = 0; i < watches.size(); i++)
     watches.cleanAll();
     watches_bin.cleanAll();
     for (int v = 0; v < nVars(); v++)
         for (int s = 0; s < 2; s++) {
             Lit p = mkLit(v, s);
+            // printf(" >>> RELOCING: %s%d\n", sign(p)?"-":"", var(p)+1);
             vec<Watcher> &ws = watches[p];
             for (int j = 0; j < ws.size(); j++)
                 ca.reloc(ws[j].cref, to);
@@ -2209,4 +2816,250 @@ void Solver::garbageCollect() {
     if (verbosity >= 2)
         printf("c |  Garbage collection:   %12d bytes => %12d bytes             |\n", ca.size() * ClauseAllocator::Unit_Size, to.size() * ClauseAllocator::Unit_Size);
     to.moveTo(ca);
+}
+
+bool Solver::call_ls(bool use_up_build) {
+    //    double start_time = cpuTime();
+
+    if (conflicts > 0 && hess) {
+        lbool status = l_Undef;
+        if (hess_order == 1) {
+            status = hess_first_order();
+        } else if (hess_order == 2) {
+            status = hess_second_order();
+        }
+        if (status == l_True) {
+            solved_by_hess = true;
+            return true;
+        }
+    }
+
+    ccnr = CCNR::ls_solver();
+    ccnr._random_seed = seed;
+    int ls_var_nums = nVars();
+    int ls_cls_nums = nClauses() + learnts_core.size() + learnts_tier2.size();
+    if (trail_lim.size() > 0)
+        ls_cls_nums += trail_lim[0];
+    else
+        ls_cls_nums += trail.size();
+    ccnr._num_vars = ls_var_nums;
+    ccnr._num_clauses = ls_cls_nums;
+    ccnr._max_mems = ls_mems_num;
+    if (!ccnr.make_space()) {
+        std::cout << "c ls solver make space error." << std::endl;
+        return false;
+    }
+
+    // build_instance
+    int ct = 0;
+    for (int idx = 0; idx < 3; ++idx) {
+        vec<CRef> &vs = (idx == 0) ? clauses : (idx == 1 ? learnts_core : (idx == 2 ? learnts_tier2 : learnts_local));
+        int vs_sz = vs.size();
+        for (int i = 0; i < vs_sz; i++) {
+            CRef &cr = vs[i];
+            Clause &c = ca[cr];
+            int cls_sz = c.size();
+            for (int j = 0; j < cls_sz; j++) {
+                int cur_lit = toFormal(c[j]);
+                ccnr._clauses[ct].literals.emplace_back(cur_lit, ct);
+            }
+            ct++;
+        }
+    }
+    if (trail_lim.size() > 0) {
+        int cls_sz = trail_lim[0];
+        for (int i = 0; i < cls_sz; i++) {
+            ccnr._clauses[ct].literals.emplace_back(toFormal(trail[i]), ct);
+            ct++;
+        }
+    } else if (trail_lim.size() == 0) {
+        int trl_sz = trail.size();
+        for (int i = 0; i < trl_sz; i++) {
+            ccnr._clauses[ct].literals.emplace_back(toFormal(trail[i]), ct);
+            ct++;
+        }
+    }
+
+    for (int c = 0; c < ccnr._num_clauses; c++) {
+        for (CCNR::lit item : ccnr._clauses[c].literals) {
+            int v = item.var_num;
+            ccnr._vars[v].literals.push_back(item);
+        }
+    }
+    ccnr.build_neighborhood();
+
+    bool res = false;
+    if (use_up_build) { // do unit propagate negalate conflicts.
+
+        // load init_soln use UP
+        int var_nums = nVars();
+        int t_sz = trail.size();
+        int idx = qhead;
+
+        int viewList_sz = t_sz - qhead;
+        vector<Lit> viewList(var_nums + 2);
+        for (int i = qhead; i < t_sz; ++i)
+            viewList[i] = trail[i];
+
+        int undef_nums = 0;
+        vector<int> undef_vars(var_nums - t_sz + 2);
+        vector<int> idx_undef_vars(var_nums + 1, -1); // undef_vars' idx is not -1
+        for (int i = 0; i < var_nums; ++i)
+            if (value(i) == l_Undef) {
+                idx_undef_vars[i] = undef_nums;
+                undef_vars[undef_nums++] = i;
+            } else {
+                ls_mediation_soln[i] = (value(i) == l_True) ? 1 : 0;
+            }
+
+        while (undef_nums > 0) {
+
+            while (idx < viewList_sz && undef_nums > 0) {
+                Lit p = viewList[idx++];
+
+                vec<Watcher> &ws_bin = watches_bin[p];
+                int ws_bin_sz = ws_bin.size();
+                for (int k = 0; k < ws_bin_sz; k++) {
+                    Lit the_other = ws_bin[k].blocker;
+                    Var the_other_var = var(the_other);
+                    if (idx_undef_vars[the_other_var] > -1) {
+                        // no conflict and can decide.
+                        ls_mediation_soln[the_other_var] = sign(the_other) ? 0 : 1;
+                        viewList[viewList_sz++] = the_other;
+
+                        int end_var = undef_vars[--undef_nums];
+                        int idx_end_var = idx_undef_vars[the_other_var];
+                        undef_vars[idx_end_var] = end_var;
+                        idx_undef_vars[end_var] = idx_end_var;
+                        idx_undef_vars[the_other_var] = -1;
+                    }
+                }
+                if (undef_nums == 0)
+                    break;
+
+                vec<Watcher> &ws = watches[p];
+                Watcher *i, *j, *end;
+                for (i = j = (Watcher *)ws, end = i + ws.size(); i != end;) {
+                    // Make sure the false literal is data[1]:
+                    CRef cr = i->cref;
+                    Clause &c = ca[cr];
+                    Lit false_lit = ~p;
+                    if (c[0] == false_lit)
+                        c[0] = c[1], c[1] = false_lit;
+                    i++;
+
+                    // If 0th watch is true, then clause is already satisfied.
+                    Lit first = c[0];
+                    Var first_var = var(first);
+                    Watcher w = Watcher(cr, first);
+                    if (idx_undef_vars[first_var] == -1 && ls_mediation_soln[first_var] == (!sign(first))) {
+                        *j++ = w;
+                        continue;
+                    }
+
+                    int c_sz = c.size();
+                    for (int k = 2; k < c_sz; ++k) {
+                        Lit tmp_lit = c[k];
+                        Var tmp_var = var(tmp_lit);
+                        if (idx_undef_vars[tmp_var] == -1 && ls_mediation_soln[tmp_var] == sign(tmp_lit)) {
+                        } else {
+                            c[1] = c[k];
+                            c[k] = false_lit;
+                            watches[~c[1]].push(w);
+                            // next clause
+                            goto check_next_clause;
+                        }
+                    }
+                    *j++ = w;
+                    if (idx_undef_vars[first_var] == -1 && ls_mediation_soln[first_var] == sign(first)) {
+                        // confliction bump
+                        //?need to break or go on ?
+                        continue;
+                    } else {
+                        // unit can assign
+                        ls_mediation_soln[first_var] = sign(first) ? 0 : 1;
+                        viewList[viewList_sz++] = first;
+
+                        int end_var = undef_vars[--undef_nums];
+                        int idx_end_var = idx_undef_vars[first_var];
+                        undef_vars[idx_end_var] = end_var;
+                        idx_undef_vars[end_var] = idx_end_var;
+                        idx_undef_vars[first_var] = -1;
+                    }
+                check_next_clause:;
+                }
+                ws.shrink(i - j);
+            }
+
+            if (undef_nums == 0)
+                break;
+
+            // pick and assign
+            // method 1: rand pick and rand assign
+            int choosevar_idx = rand() % undef_nums;
+            Var choosevar = undef_vars[choosevar_idx];
+            // int sense         = rand() % 2;
+            // Lit choose     = mkLit(choosevar,(sense==0?true:false));
+            Lit choose = mkLit(choosevar, polarity[choosevar]);
+
+            ls_mediation_soln[choosevar] = sign(choose) ? 0 : 1;
+            viewList[viewList_sz++] = choose;
+
+            int end_var = undef_vars[--undef_nums];
+            int idx_end_var = idx_undef_vars[choosevar];
+            undef_vars[idx_end_var] = end_var;
+            idx_undef_vars[end_var] = idx_end_var;
+            idx_undef_vars[choosevar] = -1;
+        }
+        // call ccanr
+        res = ccnr.local_search(&ls_mediation_soln);
+
+    } else {
+        // //use the assignment & polarity as the initial soln
+        // for(int i=0;i<ls_var_nums;++i){
+        //     lbool value_i = value(i);
+        //     if(value_i==l_Undef) ls_mediation_soln[i] = !polarity[i];
+        //     else{
+        //         ls_mediation_soln[i] = value_i==l_True?1:0;
+        //     }
+        // }
+        // //call ccanr
+        // bool res = ccnr.local_search(&ls_mediation_soln);
+
+        // use total rand mod
+        // call ccanr use rand assign
+        vector<char> *rand_signal = 0;
+        res = ccnr.local_search(rand_signal);
+    }
+
+    // int ls_var_nums = nVars();
+    // reload mediation soln
+    for (int i = 0; i < ls_var_nums; ++i) {
+        ls_mediation_soln[i] = ccnr._best_solution[i + 1];
+    }
+
+    // //rephase immediately
+    // for(int i=0;i<ls_var_nums;++i){
+    //     polarity[i] = !ls_mediation_soln[i];
+    // }
+
+    int ls_unsat_back_num = ccnr._best_found_cost;
+    if (ls_unsat_back_num <= ls_best_unsat_num) {
+        for (int i = 0; i < ls_var_nums; ++i)
+            ls_best_soln[i] = ls_mediation_soln[i];
+        ls_best_unsat_num = ls_unsat_back_num;
+    }
+
+    //    double up_time = cpuTime()-start_time;
+    //    ls_used_time += up_time;
+    //    string infoline = "c LS res(" + to_string(++ls_call_num)+ "th) = "+to_string((int)res);
+    //    infoline += " ,unsat= "+to_string(ccnr._init_unsat_nums)+" -> "+to_string(ccnr._best_found_cost);
+    //    infoline += " ,when("+to_string(conflicts)+"c,"+to_string(starts)+"r)";
+    //    infoline += ",steps= "+to_string(ccnr._step)+",time= "+to_string(up_time)+"s";
+    //    cout<<infoline<<std::endl;
+    // std::cout<<"c LS res("<<++ls_call_num<<" call) = "<<(int)res<<", init unsat num = "<<ccnr._init_unsat_nums<<", steps = "<<ccnr._step<<", best unsat num="<<ccnr._best_found_cost<<", used "<<up_time<<"s"<<std::endl;
+    if (res == true) {
+        solved_by_ls = true;
+    }
+    return res;
 }

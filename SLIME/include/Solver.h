@@ -1,10 +1,4 @@
 /****************************************************************************************[Solver.h]
-SLIME -- Copyright (c) 2020, Oscar Riveros, oscar.riveros@peqnp.science, Santiago, Chile. https://github.com/maxtuno/SLIME
-
-SLIME -- Copyright (c) 2019, Oscar Riveros, oscar.riveros@peqnp.science, Santiago, Chile. https://maxtuno.github.io/slime-sat-solver
-
-SLIME SAT Solver and The BOOST Heuristic or Variations cannot be used on any contest without express permissions of Oscar Riveros.
-
 MiniSat -- Copyright (c) 2003-2006, Niklas Een, Niklas Sorensson
            Copyright (c) 2007-2010, Niklas Sorensson
 
@@ -50,7 +44,9 @@ OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWA
 #define LOOSE_PROP_STAT
 #endif
 
+#include "Options.h"
 #include "SolverTypes.h"
+#include "ccnr.h"
 #include "mtl/Alg.h"
 #include "mtl/Heap.h"
 #include "mtl/Vec.h"
@@ -58,31 +54,33 @@ OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWA
 // duplicate learnts version
 #include <algorithm>
 #include <chrono>
-#include <cmath>
-#include <csignal>
 #include <map>
 #include <set>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
+// duplicate learnts version
 
-#ifdef MASSIVE
-#include <mpi.h>
-#endif
-
+// Don't change the actual numbers.
 #define LOCAL 0
 #define TIER2 2
 #define CORE 3
 
-namespace SLIME {
+namespace Minisat {
 
 //=================================================================================================
 // Solver -- the main class:
 
 class Solver {
   public:
-    bool log, boost, render;
-    int global, cursor, rank, master;
+    bool log, boost, hess, massive, solved_by_hess;
+    int global, cursor, rank, size, hess_cursor, hess_order, seed;
+    int oracle(int glb);
+    lbool hess_first_order();
+    lbool hess_second_order();
+    lbool neg(lbool x);
+    void rand_init();
+    vec<lbool> aux;
 
   private:
     template <typename T> class MyQueue {
@@ -228,8 +226,11 @@ class Solver {
     int learntsize_adjust_start_confl;
     double learntsize_adjust_inc;
 
-    // duplicate learnts version
+    double lsids_pick;
+    double lsids_erase_bump_weight;
 
+    // duplicate learnts version
+    uint64_t VSIDS_props_limit;
     uint32_t min_number_of_learnts_copies;
     uint32_t dupl_db_init_size;
     uint32_t max_lbd_dup;
@@ -305,7 +306,9 @@ class Solver {
     double cla_inc;           // Amount to bump next clause with.
     vec<double> activity_CHB, // A heuristic measurement of the activity of a variable.
         activity_VSIDS, activity_distance;
-    double var_inc;                                          // Amount to bump next variable with.
+    vec<double> activity_lit;
+    double var_inc; // Amount to bump next variable with.
+    double lit_inc;
     OccLists<Lit, vec<Watcher>, WatcherDeleted> watches_bin, // Watches for binary clauses only.
         watches;                                             // 'watches[lit]' is a list of constraints watching 'lit' (will go there if literal becomes true).
     vec<lbool> assigns;                                      // The current assignments.
@@ -386,8 +389,9 @@ class Solver {
     //
     void varDecayActivity();                  // Decay all variables with the specified factor. Implemented by increasing the 'bump' value instead.
     void varBumpActivity(Var v, double mult); // Increase a variable with the current 'bump' value.
-    void claDecayActivity();                  // Decay all clauses with the specified factor. Implemented by increasing the 'bump' value instead.
-    void claBumpActivity(Clause &c);          // Increase a clause with the current 'bump' value.
+    void litBumpActivity(Lit l, double mult);
+    void claDecayActivity();         // Decay all clauses with the specified factor. Implemented by increasing the 'bump' value instead.
+    void claBumpActivity(Clause &c); // Increase a clause with the current 'bump' value.
 
     // Operations on clauses:
     //
@@ -441,7 +445,7 @@ class Solver {
     static inline void byteDRUP(Lit l) {
         unsigned int u = 2 * (var(l) + 1) + sign(l);
         do {
-            *buf_ptr++ = (u & 0x7f) | 0x80;
+            *buf_ptr++ = u & 0x7f | 0x80;
             buf_len++;
             u = u >> 7;
         } while (u);
@@ -527,6 +531,7 @@ class Solver {
     uint64_t nbcollectfirstuip, nblearntclause, nbDoubleConflicts, nbTripleConflicts;
     int uip1, uip2;
     vec<int> pathCs;
+    CRef propagateLits(vec<Lit> &lits);
     uint64_t previousStarts;
     double var_iLevel_inc;
     vec<Lit> involved_lits;
@@ -556,12 +561,26 @@ class Solver {
     int last_switch_conflicts;
 
     // informations
+    CCNR::ls_solver ccnr;
     int freeze_ls_restart_num = 0;
     double ls_used_time = 0;
     int ls_call_num = 0;
     int ls_best_unsat_num = INT_MAX;
     bool solved_by_ls = false;
     int max_trail = 0;
+
+    // Phases
+    // save the recent ls soln and best ls soln, need to call ls once.
+    std::vector<char> ls_mediation_soln;
+    // with the minimum unsat clauses num in LS.
+    std::vector<char> ls_best_soln;
+    // hold the soln with the best trail size.
+    std::vector<char> top_trail_soln;
+
+    // functions
+    bool call_ls(bool use_up_build);
+    void rand_based_rephase();
+    void info_based_rephase();
 };
 
 //=================================================================================================
@@ -590,6 +609,15 @@ inline void Solver::varBumpActivity(Var v, double mult) {
     // Update order_heap with respect to new activity:
     if (order_heap_VSIDS.inHeap(v))
         order_heap_VSIDS.decrease(v);
+}
+
+inline void Solver::litBumpActivity(Lit l, double mult) {
+    if ((activity_lit[l.x] += lit_inc * mult) > 1e100) {
+        // Rescale:
+        for (int i = 0; i < 2 * nVars(); i++)
+            activity_lit[i] *= 1e-100;
+        lit_inc *= 1e-100;
+    }
 }
 
 inline void Solver::claDecayActivity() { cla_inc *= (1 / clause_decay); }
@@ -741,6 +769,6 @@ inline void Solver::toDimacs(const char *file, Lit p, Lit q, Lit r) {
 // Debug etc:
 
 //=================================================================================================
-} // namespace SLIME
+} // namespace Minisat
 
 #endif

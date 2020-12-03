@@ -24,7 +24,7 @@ OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWA
 #include <stdio.h>
 #include <stdlib.h>
 
-namespace SLIME {
+namespace Minisat {
 
 //-------------------------------------------------------------------------------------------------
 // A simple buffered character stream class:
@@ -118,6 +118,6 @@ template <class B> static bool eagerMatch(B &in, const char *str) {
 }
 
 //=================================================================================================
-} // namespace SLIME
+} // namespace Minisat
 
 #endif
