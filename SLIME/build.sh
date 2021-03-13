@@ -1,1 +1,9 @@
-g++ -std=c++11 -O3 -s -mtune=generic -Wno-unused-value -D NDEBUG -D __STDC_LIMIT_MACROS -D __STDC_FORMAT_MACROS -D LOG -I./include -I. src/*.cc -o bin/slime -static
+cd SLIME
+rm -fr build
+mkdir build
+cd build
+cmake -DCMAKE_BUILD_TYPE=Release ..
+make
+cd ..
+chmod 755 bin/slime
+chmod 755 mpi-run.sh

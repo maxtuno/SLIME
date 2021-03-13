@@ -1,0 +1,1 @@
+g++ -std=c++11 -O3 -s -mtune=generic -Wno-unused-value -D NDEBUG -D __STDC_LIMIT_MACROS -D __STDC_FORMAT_MACROS -D LOG -I./include -I. src/*.cc -o bin/slime -static
