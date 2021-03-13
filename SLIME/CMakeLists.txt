@@ -10,7 +10,7 @@ include_directories(. include)
 find_package(MPI REQUIRED)
 if (MPI_FOUND)
     set(CMAKE_CXX_COMPILER mpicxx)
-    set(CMAKE_CXX_FLAGS "-std=c++11 -O3 -s -mtune=generic -Wno-unused-value -D NDEBUG -D __STDC_LIMIT_MACROS -D __STDC_FORMAT_MACROS -MASSIVE")
+    set(CMAKE_CXX_FLAGS "-std=c++11 -O3 -mtune=generic -Wno-unused-value -D NDEBUG -D __STDC_LIMIT_MACROS -D __STDC_FORMAT_MACROS -D MASSIVE")
     add_executable(slime
             src/Ls.cc
             src/Main.cc

@@ -1,4 +1,0 @@
-/Applications/CLion.app/Contents/bin/cmake/mac/bin/cmake -DCMAKE_BUILD_TYPE=Debug -DCMAKE_C_COMPILER=/usr/local/Cellar/gcc/10.2.0_4/bin/gcc-10 -DCMAKE_CXX_COMPILER=/usr/local/Cellar/gcc/10.2.0_4/bin/g++-10 -G "CodeBlocks - Unix Makefiles" /Users/peqnp/Documents/Development/RELEASE/SAT/SLIME/SLIME
--- Configuring done
--- Generating done
--- Build files have been written to: /Users/peqnp/Documents/Development/RELEASE/SAT/SLIME/SLIME/cmake-build-debug
