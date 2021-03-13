@@ -18,13 +18,13 @@ DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
 OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 **************************************************************************************************/
 
-#ifndef SLIME_ParseUtils_h
-#define SLIME_ParseUtils_h
+#ifndef SLIME_PARSEUTILS_H
+#define SLIME_PARSEUTILS_H
 
 #include <stdio.h>
 #include <stdlib.h>
 
-namespace Minisat {
+namespace SLIME {
 
 //-------------------------------------------------------------------------------------------------
 // A simple buffered character stream class:
@@ -118,6 +118,6 @@ template <class B> static bool eagerMatch(B &in, const char *str) {
 }
 
 //=================================================================================================
-} // namespace Minisat
+} // namespace SLIME
 
 #endif

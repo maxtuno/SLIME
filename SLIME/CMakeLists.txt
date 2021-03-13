@@ -10,9 +10,9 @@ include_directories(. include)
 find_package(MPI REQUIRED)
 if (MPI_FOUND)
     set(CMAKE_CXX_COMPILER mpicxx)
-    set(CMAKE_CXX_FLAGS "-std=c++11 -O3  -fPIC -mtune=generic -D NDEBUG -D __STDC_LIMIT_MACROS -D __STDC_FORMAT_MACROS -D LOG -D MASSIVE -D MASSIVE_COOPERATIVE")
+    set(CMAKE_CXX_FLAGS "-std=c++11 -O3 -s -mtune=generic -Wno-unused-value -D NDEBUG -D __STDC_LIMIT_MACROS -D __STDC_FORMAT_MACROS -MASSIVE")
     add_executable(slime
-            src/ccnr.cc
+            src/Ls.cc
             src/Main.cc
             src/Options.cc
             src/SimpSolver.cc

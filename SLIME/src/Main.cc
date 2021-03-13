@@ -1,22 +1,41 @@
-/*****************************************************************************************[Main.cc]
-SLIME -- Copyright (c) 2020, Oscar Riveros, oscar.riveros@peqnp.science, Santiago, Chile.
+/***************************************************************************************
+SLIME -- Copyright (c) 2021, Oscar Riveros, oscar.riveros@peqnp.science,
+Santiago, Chile. https://github.com/maxtuno/SLIME
 
-http://www.peqnp.com
+DurianSat -- Copyright (c) 2020, Arijit Shaw, Kuldeep S. Meel
 
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and
-associated documentation files (the "Software"), to deal in the Software without restriction,
-including without limitation the rights to use, copy, modify, merge, publish, distribute,
-sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+SLIME -- Copyright (c) 2019, Oscar Riveros, oscar.riveros@peqnp.science,
+Santiago, Chile. https://maxtuno.github.io/slime-sat-solver
 
-The above copyright notice and this permission notice shall be included in all copies or
-substantial portions of the Software.
+Maple_LCM_Dist_Chrono -- Copyright (c) 2018, Vadim Ryvchin, Alexander Nadel
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT
-NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
-DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT
-OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+GlucoseNbSAT -- Copyright (c) 2016,Chu Min LI,Mao Luo and Fan Xiao
+                           Huazhong University of science and technology, China
+                           MIS, Univ. Picardie Jules Verne, France
+
+MapleSAT -- Copyright (c) 2016, Jia Hui Liang, Vijay Ganesh
+
+MiniSat -- Copyright (c) 2003-2006, Niklas Een, Niklas Sorensson
+           Copyright (c) 2007-2010  Niklas Sorensson
+
+Permission is hereby granted, free of charge, to any person obtaining a
+copy of this software and associated documentation files (the
+"Software"), to deal in the Software without restriction, including
+without limitation the rights to use, copy, modify, merge, publish,
+distribute, sublicense, and/or sell copies of the Software, and to
+permit persons to whom the Software is furnished to do so, subject to
+the following conditions:
+
+The above copyright notice and this permission notice shall be included
+in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
+LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
+WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 **************************************************************************************************/
 
 #include <Dimacs.h>
@@ -32,7 +51,7 @@ OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWA
 
 #define DRAT // Generate unsat proof.
 
-using namespace Minisat;
+using namespace SLIME;
 
 #if _WIN32 || _WIN64
 #include <io.h>
@@ -76,6 +95,49 @@ void printHeader() {
 
 int main(int argc, char *argv[]) {
 
+    if (argc == 1) {
+        printf("SLIME -- Copyright (c) 2021, Oscar Riveros, oscar.riveros@peqnp.science,\n");
+        printf("Santiago, Chile. https://github.com/maxtuno/SLIME\n");
+        printf("\n");
+        printf("DurianSat -- Copyright (c) 2020, Arijit Shaw, Kuldeep S. Meel\n");
+        printf("\n");
+        printf("SLIME -- Copyright (c) 2019, Oscar Riveros, oscar.riveros@peqnp.science,\n");
+        printf("Santiago, Chile. https://maxtuno.github.io/slime-sat-solver\n");
+        printf("\n");
+        printf("Maple_LCM_Dist_Chrono -- Copyright (c) 2018, Vadim Ryvchin, Alexander Nadel\n");
+        printf("\n");
+        printf("GlucoseNbSAT -- Copyright (c) 2016,Chu Min LI,Mao Luo and Fan Xiao\n");
+        printf("                Huazhong University of science and technology, China\n");
+        printf("                MIS, Univ. Picardie Jules Verne, France\n");
+        printf("\n");
+        printf("MapleSAT -- Copyright (c) 2016, Jia Hui Liang, Vijay Ganesh\n");
+        printf("\n");
+        printf("MiniSat -- Copyright (c) 2003-2006, Niklas Een, Niklas Sorensson\n");
+        printf("           Copyright (c) 2007-2010  Niklas Sorensson\n");
+        printf("\n");
+        printf("Permission is hereby granted, free of charge, to any person obtaining a\n");
+        printf("copy of this software and associated documentation files (the\n");
+        printf("\"Software\", to deal in the Software without restriction, including\n");
+        printf("without limitation the rights to use, copy, modify, merge, publish,\n");
+        printf("distribute, sublicense, and/or sell copies of the Software, and to\n");
+        printf("permit persons to whom the Software is furnished to do so, subject to\n");
+        printf("the following conditions:\n");
+        printf("\n");
+        printf("The above copyright notice and this permission notice shall be included\n");
+        printf("in all copies or substantial portions of the Software.\n");
+        printf("\n");
+        printf("THE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS\n");
+        printf("OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF\n");
+        printf("MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND\n");
+        printf("NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE\n");
+        printf("LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION\n");
+        printf("OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION\n");
+        printf("WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.\n");
+        exit(0);
+    }
+
+    parseOptions(argc, argv, true);
+
     SimpSolver S;
 
 #ifdef MASSIVE    
@@ -87,80 +149,11 @@ int main(int argc, char *argv[]) {
     S.size = 1;
 #endif
 
+    S.render = true;
+
     if (S.rank == 0) {
-        if (argc == 1) {
-            printf("///////////////////////////////////////////////////////////////////////////////\n");
-            printf("//        Copyright (c) 2012-2020 Oscar Riveros. all rights reserved.        //\n");
-            printf("//                        oscar.riveros@peqnp.science                        //\n");
-            printf("//                                                                           //\n");
-            printf("//   without any restriction, Oscar Riveros reserved rights, patents and     //\n");
-            printf("//  commercialization of this knowledge or derived directly from this work.  //\n");
-            printf("///////////////////////////////////////////////////////////////////////////////\n");
-            printf("\n");
-            printf("SLIME 5 -- Copyright (c) 2020, Oscar Riveros, oscar.riveros@peqnp.science\n");
-            printf("Santiago, Chile.\n");
-            printf("\n");
-            printf("https://www.peqnp.com\n");
-            printf("\n");
-            printf("The above copyright notice and this permission notice shall be included in all\n");
-            printf("copies or substantial portions of the Software.\n");
-            printf("\n");
-            printf("THE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\n");
-            printf("IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,\n");
-            printf("FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE\n");
-            printf("AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER\n");
-            printf("LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,\n");
-            printf("OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE\n");
-            printf("SOFTWARE.\n");
-            printf("\n");
-            printf("SLIME SAT Solver and The BOOST Heuristic or Variations cannot be used on any \n");
-            printf("contest without express permissions of Oscar Riveros.\n");
-            printf("\n");
-            printf("------------------------------------------------------------------------------\n");
-            printf("\n");
-            printf("SLIME 4 -- Copyright (c) 2020, Oscar Riveros, oscar.riveros@peqnp.science\n");
-            printf("Santiago, Chile. https://github.com/maxtuno/SLIME\n");
-            printf("\n");
-            printf("SLIME 3 -- Copyright (c) 2019, Oscar Riveros, oscar.riveros@peqnp.science\n");
-            printf("Santiago, Chile. https://maxtuno.github.io/slime-sat-solver\n");
-            printf("\n");
-            printf("DurianSat -- Copyright (c) 2020, Arijit Shaw, Kuldeep S. Meel\n");
-            printf("\n");
-            printf("Maple_LCM_Dist_Chrono -- Copyright (c) 2018, Vadim Ryvchin, Alexander Nadel\n");
-            printf("\n");
-            printf("GlucoseNbSAT -- Copyright (c) 2016,Chu Min LI,Mao Luo and Fan Xiao\n");
-            printf("Huazhong University of science and technology, China\n");
-            printf("MIS, Univ. Picardie Jules Verne, France\n");
-            printf("\n");
-            printf("MapleSAT -- Copyright (c) 2016, Jia Hui Liang, Vijay Ganesh\n");
-            printf("\n");
-            printf("MiniSat -- Copyright (c) 2003-2006, Niklas Een, Niklas Sorensson\n");
-            printf("           Copyright (c) 2007-2010  Niklas Sorensson\n");
-            printf("\n");
-            printf("Permission is hereby granted, free of charge, to any person obtaining a\n");
-            printf("copy of this software and associated documentation files (the\n");
-            printf("\"Software\"), to deal in the Software without restriction, including\n");
-            printf("without limitation the rights to use, copy, modify, merge, publish,\n");
-            printf("distribute, sublicense, and/or sell copies of the Software, and to\n");
-            printf("permit persons to whom the Software is furnished to do so, subject to\n");
-            printf("the following conditions:\n");
-            printf("\n");
-            printf("The above copyright notice and this permission notice shall be included\n");
-            printf("in all copies or substantial portions of the Software.\n");
-            printf("\n");
-            printf("THE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS\n");
-            printf("OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF\n");
-            printf("MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND\n");
-            printf("NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE\n");
-            printf("LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION\n");
-            printf("OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION\n");
-            printf("WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.\n");
-            exit(0);
-        }
         printHeader();
     }
-
-    parseOptions(argc, argv, true);
 
 #ifdef LOG
     S.log = true;
