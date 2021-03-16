@@ -1,2 +1,2 @@
 #!/bin/bash
-./slime_cli ${1} ${2}/proof.out
+./slime ${1} ${2}/proof.out
