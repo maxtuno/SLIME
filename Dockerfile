@@ -40,8 +40,11 @@ RUN cd SLIME
 RUN sh SLIME/build.sh
 
 ADD SLIME/mpi-run.sh supervised-scripts/mpi-run.sh
-ADD SLIME/make_combined_hostfile.py supervised-scripts/make_combined_hostfile.py
 RUN chmod 755 supervised-scripts/mpi-run.sh
-EXPOSE 22
 
+ADD SLIME/make_combined_hostfile.py supervised-scripts/make_combined_hostfile.py
+RUN chmod 755 supervised-scripts/make_combined_hostfile.py
+
+USER slime
+CMD ["/usr/sbin/sshd", "-D", "-f", "/home/slime/.ssh/sshd_config"]
 CMD supervised-scripts/mpi-run.sh
