@@ -2080,6 +2080,7 @@ lbool Solver::solve_() {
 
 #ifdef MASSIVE
     massive = true;
+    hess = rank % 2;
 #endif
 
     if (massive) {
