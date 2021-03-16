@@ -60,7 +60,7 @@ wait_for_nodes () {
   cat combined_hostfile
 
   # REPLACE THE FOLLOWING LINE WITH YOUR PARTICULAR SOLVER
-  time mpirun -quiet --mca btl_tcp_if_include eth0 --allow-run-as-root -np ${AWS_BATCH_JOB_NUM_NODES} --hostfile combined_hostfile /SLIME/bin/slime -c=${NUM_PROCESSES} -t=28800 -d=7 supervised-scripts/test.cnf
+  time mpirun -quiet --mca btl_tcp_if_include eth0 --allow-run-as-root -np ${AWS_BATCH_JOB_NUM_NODES} --hostfile combined_hostfile /SLIME/bin/slime supervised-scripts/test.cnf
 }
 
 # Fetch and run a script
