@@ -84,7 +84,7 @@ static DoubleOption opt_lsids_erase_weight("LSIDS", "lsids-erase-weight", "Weigh
 
 static BoolOption opt_boost("BOOST", "boost", "Specifies the use BOOST algorithm.", true);
 static BoolOption opt_boost_alternate("BOOST", "boost-alternate", "Specifies the use BOOST alternate algorithm.", true);
-static BoolOption opt_hess("HESS", "hess", "Specifies the use HESS algorithm.", true);
+static BoolOption opt_hess("HESS", "hess", "Specifies the use HESS algorithm.", false);
 static IntOption opt_hess_order("HESS", "hess-order", "Specifies the order of HESS algorithm.", 1, IntRange(1, 2));
 static BoolOption opt_massive("MASSIVE", "massive", "Specifies the use for MASSIVE execution.", false);
 //=================================================================================================
@@ -2080,7 +2080,6 @@ lbool Solver::solve_() {
 
 #ifdef MASSIVE
     massive = true;
-    hess = rank % 2;
 #endif
 
     if (massive) {
