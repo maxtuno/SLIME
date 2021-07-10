@@ -83,7 +83,7 @@ static IntOption opt_VSIDS_props_limit("DUP-LEARNTS", "VSIDS-lim", "specifies th
 static DoubleOption opt_lsids_erase_weight("LSIDS", "lsids-erase-weight", "Weight for LSIDS bump.", 2.0, DoubleRange(0, true, 5, true));
 
 static BoolOption opt_boost("BOOST", "boost", "Specifies the use BOOST algorithm.", true);
-static BoolOption opt_boost_alternate("BOOST", "boost-alternate", "Specifies the use BOOST alternate algorithm.", true);
+static BoolOption opt_boost_alternate("BOOST", "boost-alternate", "Specifies the use BOOST alternate algorithm.", false);
 static BoolOption opt_hess("HESS", "hess", "Specifies the use HESS algorithm.", false);
 static IntOption opt_hess_order("HESS", "hess-order", "Specifies the order of HESS algorithm.", 1, IntRange(1, 2));
 static BoolOption opt_massive("MASSIVE", "massive", "Specifies the use for MASSIVE execution.", false);
