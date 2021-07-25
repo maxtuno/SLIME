@@ -555,7 +555,7 @@ namespace SLIME {
         bool mediation_used = false;
 
         int switch_heristic_mod = 500; // starts
-        int last_switch_conflicts;
+        int last_switch_conflicts = 0;
 
         // informations
         LS::ls ccnr;
