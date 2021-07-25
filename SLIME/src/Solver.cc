@@ -457,13 +457,13 @@ int Solver::is_duplicate(std::vector<uint32_t> &c) {
                 it2->second++;
                 res = it2->second;
             } else {
-                ht[head][sz][hash] = 1;
+                ht[head][sz][hash] = !ht[head][sz][hash];
             }
         } else {
-            ht[head][sz][hash] = 1;
+            ht[head][sz][hash] = !ht[head][sz][hash];
         }
     } else {
-        ht[head][sz][hash] = 1;
+        ht[head][sz][hash] = !ht[head][sz][hash];
     }
     return res;
 }
@@ -2183,7 +2183,7 @@ lbool Solver::solve_() {
                 canceled.clear();
 #endif
             }
-            last_switch_conflicts = starts;
+            last_switch_conflicts = luby(restart_inc, curr_restarts) * starts;
         }
     }
 
