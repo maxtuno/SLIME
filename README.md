@@ -16,6 +16,7 @@
     c
 
 ### Winner of Crypto Track and 3rd place on Cloud Track at the SAT Competition 2021 https://satcompetition.github.io/2021/
+<img src="https://raw.githubusercontent.com/maxtuno/SLIME/master/SLIME/doc/medals.jpeg"/>
 <img src="https://raw.githubusercontent.com/maxtuno/SLIME/master/SLIME/doc/crypto.png"/>
 <img src="https://raw.githubusercontent.com/maxtuno/SLIME/master/SLIME/doc/cloud.png"/>
 
