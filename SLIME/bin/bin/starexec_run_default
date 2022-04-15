@@ -1,3 +1,0 @@
-#!/bin/bash
-./slime ${1} 
-# ${2}/proof.out
