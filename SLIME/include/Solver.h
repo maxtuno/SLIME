@@ -1,10 +1,10 @@
 /***************************************************************************************
-SLIME -- Copyright (c) 2021, Oscar Riveros, oscar.riveros@peqnp.science,
+SLIME -- Copyright (c) 2021, Oscar Riveros, oscar.riveros@sat-x.io,
 Santiago, Chile. https://github.com/maxtuno/SLIME
 
 DurianSat -- Copyright (c) 2020, Arijit Shaw, Kuldeep S. Meel
 
-SLIME -- Copyright (c) 2019, Oscar Riveros, oscar.riveros@peqnp.science,
+SLIME -- Copyright (c) 2019, Oscar Riveros, oscar.riveros@sat-x.io,
 Santiago, Chile. https://maxtuno.github.io/slime-sat-solver
 
 Maple_LCM_Dist_Chrono -- Copyright (c) 2018, Vadim Ryvchin, Alexander Nadel
@@ -67,6 +67,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
+#include <numeric>
 // duplicate learnts version
 
 // Don't change the actual numbers.
@@ -378,6 +379,7 @@ namespace SLIME {
         void analyzeFinal(Lit p, vec<Lit> &out_conflict);                               // COULD THIS BE IMPLEMENTED BY THE ORDINARIY "analyze" BY SOME REASONABLE GENERALIZATION?
         bool litRedundant(Lit p, uint32_t abstract_levels);                             // (helper method for 'analyze()')
         lbool search(int &nof_conflicts);                                               // Search for a given number of conflicts.
+        lbool search_aux(int &nof_conflicts);                                               // Search for a given number of conflicts.
         lbool solve_();                                                                 // Main solve method (assumptions given in 'assumptions').
         void reduceDB();                                                                // Reduce the set of learnt clauses.
         void reduceDB_Tier2();
@@ -575,7 +577,9 @@ namespace SLIME {
         // functions
         bool call_ls(bool use_up_build);
 
-        void rand_based_rephase();
+        std::vector<int> seq;
+
+        void rand_based_rephase(std::vector<int> &seq);
 
         void info_based_rephase();
     };

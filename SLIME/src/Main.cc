@@ -1,10 +1,13 @@
 /***************************************************************************************
-SLIME -- Copyright (c) 2021, Oscar Riveros, oscar.riveros@peqnp.science,
+SLIME -- Copyright (c) 2022, Oscar Riveros, oscar.riveros@gmail.com,
+Santiago, Chile. https://github.com/maxtuno/SLIME
+
+SLIME -- Copyright (c) 2021, Oscar Riveros, oscar.riveros@sat-x.io,
 Santiago, Chile. https://github.com/maxtuno/SLIME
 
 DurianSat -- Copyright (c) 2020, Arijit Shaw, Kuldeep S. Meel
 
-SLIME -- Copyright (c) 2019, Oscar Riveros, oscar.riveros@peqnp.science,
+SLIME -- Copyright (c) 2019, Oscar Riveros, oscar.riveros@sat-x.io,
 Santiago, Chile. https://maxtuno.github.io/slime-sat-solver
 
 Maple_LCM_Dist_Chrono -- Copyright (c) 2018, Vadim Ryvchin, Alexander Nadel
@@ -69,7 +72,9 @@ void printHeader() {
     std::wcout << L"c ░  ░  ░    ░ ░    ▒ ░░      ░      ░    \n";
     std::wcout << L"c       ░      ░  ░ ░         ░      ░  ░ \n";
     std::wcout << L"c                                         \n";
-    std::wcout << L"c           http://www.peqnp.com          \n";
+    std::wcout << L"c       https://twitter.com/maxtuno       \n";
+    std::wcout << L"c                                         \n";
+    std::wcout << L"c                [GRAVITY]                \n";
     std::wcout << L"c                                         \n";
     _setmode(_fileno(stdout), _O_TEXT);
 }
@@ -87,7 +92,9 @@ void printHeader() {
     printf("c ░  ░  ░    ░ ░    ▒ ░░      ░      ░    \n");
     printf("c       ░      ░  ░ ░         ░      ░  ░ \n");
     printf("c                                         \n");
-    printf("c           http://www.peqnp.com          \n");
+    printf("c       https://twitter.com/maxtuno       \n");
+    printf("c                                         \n");
+    printf("c                [GRAVITY]                \n");
     printf("c                                         \n");
 }
 
@@ -96,12 +103,15 @@ void printHeader() {
 int main(int argc, char *argv[]) {
 
     if (argc == 1) {
-        printf("SLIME -- Copyright (c) 2021, Oscar Riveros, oscar.riveros@peqnp.science,\n");
+        printf("SLIME -- Copyright (c) 2022, Oscar Riveros, oscar.riveros@gmail.com,\n");
+        printf("Santiago, Chile. https://github.com/maxtuno/SLIME\n");
+        printf("\n");
+        printf("SLIME -- Copyright (c) 2021, Oscar Riveros, oscar.riveros@sat-x.io,\n");
         printf("Santiago, Chile. https://github.com/maxtuno/SLIME\n");
         printf("\n");
         printf("DurianSat -- Copyright (c) 2020, Arijit Shaw, Kuldeep S. Meel\n");
         printf("\n");
-        printf("SLIME -- Copyright (c) 2019, Oscar Riveros, oscar.riveros@peqnp.science,\n");
+        printf("SLIME -- Copyright (c) 2019, Oscar Riveros, oscar.riveros@sat-x.io,\n");
         printf("Santiago, Chile. https://maxtuno.github.io/slime-sat-solver\n");
         printf("\n");
         printf("Maple_LCM_Dist_Chrono -- Copyright (c) 2018, Vadim Ryvchin, Alexander Nadel\n");
@@ -197,9 +207,10 @@ int main(int argc, char *argv[]) {
             if (S.model[i] != l_Undef) {
                 printf("%s%s%d", (i == 0) ? "" : " ", (S.model[i] == l_True) ? "" : "-", i + 1);
             }
+            /*
             if (i && i % 10 == 0) {
                 printf("\nv");                
-            }
+            }*/
         }
         printf(" 0\n");
     } else {

@@ -7,10 +7,11 @@ set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/lib)
 
 include_directories(. include)
 
-find_package(MPI REQUIRED)
-if (MPI_FOUND)
-    set(CMAKE_CXX_COMPILER mpicxx)
-    set(CMAKE_CXX_FLAGS "-std=c++11 -O3 -mtune=generic -Wno-unused-value -D NDEBUG -D __STDC_LIMIT_MACROS -D __STDC_FORMAT_MACROS -D MASSIVE")
+# find_package(MPI REQUIRED)
+# if (MPI_FOUND)
+#     set(CMAKE_CXX_COMPILER mpicxx)
+#     set(CMAKE_CXX_FLAGS "-std=c++11 -O3 -mtune=generic -Wno-unused-value -D NDEBUG -D __STDC_LIMIT_MACROS -D __STDC_FORMAT_MACROS -D MASSIVE -D LOG")
+set(CMAKE_CXX_FLAGS "-std=c++11 -O3 -mtune=generic -Wall -Wextra -Wno-unused-value -D NDEBUG -D __STDC_LIMIT_MACROS -D __STDC_FORMAT_MACROS -D LOG -static")
     add_executable(slime
             src/Ls.cc
             src/Main.cc
@@ -18,4 +19,4 @@ if (MPI_FOUND)
             src/SimpSolver.cc
             src/Solver.cc
             )
-endif (MPI_FOUND)
+# endif (MPI_FOUND)
