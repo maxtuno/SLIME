@@ -1,4 +1,7 @@
 /***************************************************************************************
+SLIME -- Copyright (c) 2022, Oscar Riveros, oscar.riveros@gmail.com,
+Santiago, Chile. https://github.com/maxtuno/SLIME
+
 SLIME -- Copyright (c) 2021, Oscar Riveros, oscar.riveros@sat-x.io,
 Santiago, Chile. https://github.com/maxtuno/SLIME
 
@@ -87,6 +90,16 @@ static BoolOption opt_boost_alternate("BOOST", "boost-alternate", "Specifies the
 static BoolOption opt_hess("HESS", "hess", "Specifies the use HESS algorithm.", false);
 static IntOption opt_hess_order("HESS", "hess-order", "Specifies the order of HESS algorithm.", 1, IntRange(1, 2));
 static BoolOption opt_massive("MASSIVE", "massive", "Specifies the use for MASSIVE execution.", false);
+
+static BoolOption opt_use_distance("DISTANCE", "use-distance", "Specifies the use DISTANCE algorithm.", true);
+static BoolOption opt_invert_polarity("POLARITY", "invert-polarity", "Specifies the invert polarity initialization.", false);
+
+
+#ifdef MASSIVE
+static BoolOption opt_alternate_sharing("MASSIVE", "alternate-sharing", "Specifies alternate sharing clauses on massive algorithm.", false);
+static BoolOption opt_sharing_clauses("MASSIVE", "sharing-clauses", "Specifies sharing clauses on massive algorithm.", false);
+static IntOption opt_filter("MASSIVE", "filter", "Specifies the filter size for shared clauses.", 100, IntRange(1, INT32_MAX));
+#endif
 //=================================================================================================
 // Constructor/Destructor:
 
@@ -121,7 +134,12 @@ Solver::Solver()
         // simplifyAll adjust occasion
         ,
         curSimplify(1), nbconfbeforesimplify(1000), incSimplify(1000),
-        my_var_decay(0.6), DISTANCE(true), var_iLevel_inc(1), order_heap_distance(VarOrderLt(activity_distance)) {}
+        my_var_decay(0.6), DISTANCE(true), var_iLevel_inc(1), order_heap_distance(VarOrderLt(activity_distance)), use_distance(opt_use_distance), invert_polarity(opt_invert_polarity)
+#ifdef MASSIVE
+, filter(opt_filter)
+, sharing_clauses(opt_sharing_clauses)
+#endif
+{}
 
 Solver::~Solver() {}
 
@@ -337,9 +355,6 @@ void Solver::simplifyLearnt(Clause &c) {
 }
 
 bool Solver::simplifyLearnt_core() {
-    int beforeSize, afterSize;
-    int learnts_core_size_before = learnts_core.size();
-
     int ci, cj, li, lj;
     bool sat, false_lit;
     unsigned int nblevels;
@@ -382,12 +397,10 @@ bool Solver::simplifyLearnt_core() {
                     c.shrink(li - lj);
                 }
 
-                beforeSize = c.size();
                 assert(c.size() > 1);
                 // simplify a learnt clause c
                 simplifyLearnt(c);
                 assert(c.size() > 0);
-                afterSize = c.size();
 
                 if (drup_file && saved_size != c.size()) {
 #ifdef BIN_DRUP
@@ -469,9 +482,6 @@ int Solver::is_duplicate(std::vector<uint32_t> &c) {
 }
 
 bool Solver::simplifyLearnt_tier2() {
-    int beforeSize, afterSize;
-    int learnts_tier2_size_before = learnts_tier2.size();
-
     int ci, cj, li, lj;
     bool sat, false_lit;
     unsigned int nblevels;
@@ -514,12 +524,10 @@ bool Solver::simplifyLearnt_tier2() {
                     c.shrink(li - lj);
                 }
 
-                beforeSize = c.size();
                 assert(c.size() > 1);
                 // simplify a learnt clause c
                 simplifyLearnt(c);
                 assert(c.size() > 0);
-                afterSize = c.size();
 
                 if (drup_file && saved_size != c.size()) {
 
@@ -629,12 +637,15 @@ Var Solver::newVar(bool sign, bool dvar) {
 
     seen.push(0);
     seen2.push(0);
-    polarity.push(sign);
+    polarity.push(opt_invert_polarity ? !sign : sign);
     decision.push();
     trail.capacity(v + 1);
     setDecisionVar(v, dvar);
 
-    activity_distance.push(0);
+    if (use_distance) {
+        activity_distance.push(0);
+    }
+
     var_iLevel.push(0);
     var_iLevel_tmp.push(0);
     pathCs.push(0);
@@ -822,7 +833,7 @@ void Solver::cancelUntil(int bLevel) {
 
 Lit Solver::pickBranchLit() {
     Var next = var_Undef;
-    Heap<VarOrderLt> &order_heap = DISTANCE ? order_heap_distance : ((!VSIDS) ? order_heap_CHB : order_heap_VSIDS);
+    Heap<VarOrderLt> &order_heap = use_distance ? (DISTANCE ? order_heap_distance : ((!VSIDS) ? order_heap_CHB : order_heap_VSIDS)) : ((!VSIDS) ? order_heap_CHB : order_heap_VSIDS);
 
     // Activity based decision:
     while (next == var_Undef || value(next) != l_Undef || !decision[next])
@@ -891,7 +902,7 @@ inline Solver::ConflictData Solver::FindConflictLevel(CRef cind) {
             highestId = nLitId;
             data.nHighestLevel = nLevel;
             data.bOnlyOneLitFromHighest = true;
-        } else if (nLevel == data.nHighestLevel && data.bOnlyOneLitFromHighest == true) {
+        } else if (nLevel == data.nHighestLevel && data.bOnlyOneLitFromHighest) {
             data.bOnlyOneLitFromHighest = false;
         }
     }
@@ -1440,7 +1451,9 @@ void Solver::rebuildOrderHeap() {
 
     order_heap_CHB.build(vs);
     order_heap_VSIDS.build(vs);
-    order_heap_distance.build(vs);
+    if (use_distance) {
+        order_heap_distance.build(vs);
+    }
 }
 
 /*_________________________________________________________________________________________________
@@ -1537,29 +1550,31 @@ bool Solver::collectFirstUIP(CRef confl) {
             involved_lits.push(p);
         }
     }
-    double inc = var_iLevel_inc;
-    vec<int> level_incs;
-    level_incs.clear();
-    for (int i = 0; i < max_level; i++) {
-        level_incs.push(inc);
-        inc = inc / my_var_decay;
-    }
-
-    for (int i = 0; i < involved_lits.size(); i++) {
-        Var v = var(involved_lits[i]);
-        activity_distance[v] += var_iLevel_tmp[v] * level_incs[var_iLevel_tmp[v] - 1];
-
-        if (activity_distance[v] > 1e100) {
-            for (int vv = 0; vv < nVars(); vv++)
-                activity_distance[vv] *= 1e-100;
-            var_iLevel_inc *= 1e-100;
-            for (int j = 0; j < max_level; j++)
-                level_incs[j] *= 1e-100;
+    if (use_distance) {
+        double inc = var_iLevel_inc;
+        vec<int> level_incs;
+        level_incs.clear();
+        for (int i = 0; i < max_level; i++) {
+            level_incs.push(inc);
+            inc = inc / my_var_decay;
         }
-        if (order_heap_distance.inHeap(v))
-            order_heap_distance.decrease(v);
+
+        for (int i = 0; i < involved_lits.size(); i++) {
+            Var v = var(involved_lits[i]);
+            activity_distance[v] += var_iLevel_tmp[v] * level_incs[var_iLevel_tmp[v] - 1];
+
+            if (activity_distance[v] > 1e100) {
+                for (int vv = 0; vv < nVars(); vv++)
+                    activity_distance[vv] *= 1e-100;
+                var_iLevel_inc *= 1e-100;
+                for (int j = 0; j < max_level; j++)
+                    level_incs[j] *= 1e-100;
+            }
+            if (order_heap_distance.inHeap(v))
+                order_heap_distance.decrease(v);
+        }
+        var_iLevel_inc = level_incs[level_incs.size() - 1];
     }
-    var_iLevel_inc = level_incs[level_incs.size() - 1];
     return true;
 }
 
@@ -1580,7 +1595,7 @@ void Solver::info_based_rephase() {
     int var_nums = nVars();
     for (int i = 0; i < var_nums; ++i)
         polarity[i] = !ls_mediation_soln[i];
-    if (!DISTANCE) {
+    if (!use_distance || !DISTANCE) {
         for (int i = 0; i < var_nums; ++i) {
             if (ccnr.conflict_ct[i + 1] > 0) {
                 if (VSIDS) {
@@ -1630,18 +1645,6 @@ void Solver::rand_based_rephase(std::vector<int> &seq) {
     } else if (seq[8] == 8) {
         for (int i = 0; i < var_nums; ++i)
             polarity[i] = 0;
-    } else if (seq[9] == 9) {
-        for (int i = 0; i < var_nums; ++i)
-            polarity[i] = top_trail_soln[i] ^ ls_best_soln[i] ^ ls_mediation_soln[i];
-    } else if (seq[10] == 10) {
-        for (int i = 0; i < var_nums; ++i)
-            polarity[i] = top_trail_soln[i] & ls_best_soln[i] & ls_mediation_soln[i];
-    } else if (seq[11] == 11) {
-        for (int i = 0; i < var_nums; ++i)
-            polarity[i] = top_trail_soln[i] | ls_best_soln[i] | ls_mediation_soln[i];
-    } else if (seq[12] == 12) {
-        for (int i = 0; i < var_nums; ++i)
-            polarity[i] = (top_trail_soln[i] + ls_best_soln[i] + ls_mediation_soln[i]) % 2;
     }
         // 50
     else {
@@ -1649,20 +1652,19 @@ void Solver::rand_based_rephase(std::vector<int> &seq) {
     }
 }
 
-lbool Solver::search_aux(int& nof_conflicts)
-{
+lbool Solver::search_aux(int &nof_conflicts) {
     assert(ok);
-    int         backtrack_level;
-    int         lbd;
-    vec<Lit>    learnt_clause;
-    bool        cached = false;
+    int backtrack_level;
+    int lbd;
+    vec<Lit> learnt_clause;
+    bool cached = false;
     starts++;
 
     freeze_ls_restart_num--;
-    bool    can_call_ls = true;
+    bool can_call_ls = true;
 
     // if(ls_call_num>1){
-    if(conflicts%100<50) info_based_rephase();
+    if (conflicts % 100 < 50) info_based_rephase();
     else rand_based_rephase(seq);
     // }
 
@@ -1670,36 +1672,72 @@ lbool Solver::search_aux(int& nof_conflicts)
 
     // simplify
     //
-    if (conflicts >= curSimplify * nbconfbeforesimplify){
+    if (conflicts >= curSimplify * nbconfbeforesimplify) {
         //        printf("c ### simplifyAll on conflict : %lld\n", conflicts);
         //printf("nbClauses: %d, nbLearnts_core: %d, nbLearnts_tier2: %d, nbLearnts_local: %d, nbLearnts: %d\n",
         //	clauses.size(), learnts_core.size(), learnts_tier2.size(), learnts_local.size(),
         //	learnts_core.size() + learnts_tier2.size() + learnts_local.size());
         nbSimplifyAll++;
-        if (!simplifyAll()){
+        if (!simplifyAll()) {
             return l_False;
         }
         curSimplify = (conflicts / nbconfbeforesimplify) + 1;
         nbconfbeforesimplify += incSimplify;
     }
 
-    for (;;){
+    for (;;) {
+#ifdef MASSIVE
+        //if (sharing_clauses) {
+            int flag;
+            do {
+                flag = 0;
+                for (int irank = 0; irank < size; irank++) {
+                    if (irank != rank) {
+                        MPI_Status my_status;
+                        MPI_Iprobe(irank, MPI_ANY_TAG, MPI_COMM_WORLD, &flag, &my_status);
+                        if (flag) {
+                            MPI_Request recv_request;
+                            MPI_Status recv_status;
+                            int recv_buffer_len;
+                            MPI_Get_count(&my_status, MPI_INT, &recv_buffer_len);
+                            int recv_buffer[recv_buffer_len];
+                            MPI_Irecv(recv_buffer, recv_buffer_len, MPI_INT, my_status.MPI_SOURCE, my_status.MPI_TAG, MPI_COMM_WORLD, &recv_request);
+                            MPI_Wait(&recv_request, &recv_status);
+                            if (recv_buffer_len == 1) {
+                                if (value(toLit(recv_buffer[0])) == l_Undef) {
+                                    uncheckedEnqueue(toLit(recv_buffer[0]));
+                                }
+                            } else {
+                                learnt_clause.clear();
+                                for (int i = 0; i < recv_buffer_len; i++) {
+                                    learnt_clause.push(toLit(recv_buffer[i]));
+                                }
+                                CRef cr = ca.alloc(learnt_clause, true);
+                                learnts_local.push(cr);
+                                attachClause(cr);
+                                claBumpActivity(ca[cr]);
+                            }
+                        }
+                    }
+                }
+            } while (flag);
+        //}
+#endif
         CRef confl = propagate();
 
 
-        if (confl != CRef_Undef){
+        if (confl != CRef_Undef) {
             // CONFLICT
-            if (VSIDS){
+            if (VSIDS) {
                 if (--timer == 0 && var_decay < 0.95) timer = 5000, var_decay += 0.01;
-            }else
-            if (step_size > min_step_size) step_size -= step_size_dec;
+            } else if (step_size > min_step_size) step_size -= step_size_dec;
 
-            conflicts++; nof_conflicts--;
+            conflicts++;
+            nof_conflicts--;
             //if (conflicts == 100000 && learnts_core.size() < 100) core_lbd_cut = 5;
             ConflictData data = FindConflictLevel(confl);
             if (data.nHighestLevel == 0) return l_False;
-            if (data.bOnlyOneLitFromHighest)
-            {
+            if (data.bOnlyOneLitFromHighest) {
                 cancelUntil(data.nHighestLevel - 1);
                 continue;
             }
@@ -1707,55 +1745,70 @@ lbool Solver::search_aux(int& nof_conflicts)
             learnt_clause.clear();
             analyze(confl, learnt_clause, backtrack_level, lbd);
             // check chrono backtrack condition
-            if ((confl_to_chrono < 0 || confl_to_chrono <= conflicts) && chrono > -1 && (decisionLevel() - backtrack_level) >= chrono)
-            {
+            if ((confl_to_chrono < 0 || confl_to_chrono <= conflicts) && chrono > -1 && (decisionLevel() - backtrack_level) >= chrono) {
                 ++chrono_backtrack;
-                cancelUntil(data.nHighestLevel -1);
-            }
-            else // default behavior
+                cancelUntil(data.nHighestLevel - 1);
+            } else // default behavior
             {
                 ++non_chrono_backtrack;
                 cancelUntil(backtrack_level);
             }
 
+#ifdef MASSIVE
+            if (sharing_clauses && learnt_clause.size() <= filter) {
+                int buffer_len = learnt_clause.size();
+                int send_buffer[buffer_len];
+                MPI_Request my_request[size - 1];
+                for (int i = 0; i < buffer_len; i++) {
+                    send_buffer[i] = toInt(learnt_clause[i]);
+                }
+                for (int i = 0, j = 0; i < size; i++) {
+                    if (i != rank) MPI_Isend(send_buffer, buffer_len, MPI_INT, i, i, MPI_COMM_WORLD, &my_request[j++]);
+                }
+                MPI_Waitall(size - 1, my_request, MPI_STATUS_IGNORE);
+            }
+#endif
+
             lbd--;
-            if (VSIDS){
+            if (VSIDS) {
                 cached = false;
                 conflicts_VSIDS++;
                 lbd_queue.push(lbd);
-                global_lbd_sum += (lbd > 50 ? 50 : lbd); }
+                global_lbd_sum += (lbd > 50 ? 50 : lbd);
+            }
 
-            if (learnt_clause.size() == 1){
+            if (learnt_clause.size() == 1) {
                 uncheckedEnqueue(learnt_clause[0]);
-            }else{
+            } else {
                 CRef cr = ca.alloc(learnt_clause, true);
                 ca[cr].set_lbd(lbd);
                 //duplicate learnts
-                int  id = 0;
-                if (lbd <= max_lbd_dup){
+                int id = 0;
+                if (lbd <= max_lbd_dup) {
                     std::vector<uint32_t> tmp;
                     for (int i = 0; i < learnt_clause.size(); i++)
                         tmp.push_back(learnt_clause[i].x);
                     id = is_duplicate(tmp);
-                    if (id == min_number_of_learnts_copies +1){
+                    if (id == min_number_of_learnts_copies + 1) {
                         duplicates_added_conflicts++;
                     }
-                    if (id == min_number_of_learnts_copies){
+                    if (id == min_number_of_learnts_copies) {
                         duplicates_added_tier2++;
                     }
                 }
                 //duplicate learnts
 
-                if ((lbd <= core_lbd_cut) || (id == min_number_of_learnts_copies+1)){
+                if ((lbd <= core_lbd_cut) || (id == min_number_of_learnts_copies + 1)) {
                     learnts_core.push(cr);
                     ca[cr].mark(CORE);
-                }else if ((lbd <= 6)||(id == min_number_of_learnts_copies)){
+                } else if ((lbd <= 6) || (id == min_number_of_learnts_copies)) {
                     learnts_tier2.push(cr);
                     ca[cr].mark(TIER2);
                     ca[cr].touched() = conflicts;
-                }else{
+                } else {
                     learnts_local.push(cr);
-                    claBumpActivity(ca[cr]); }
+                    claBumpActivity(ca[cr]);
+                }
                 attachClause(cr);
 
                 uncheckedEnqueue(learnt_clause[0], backtrack_level, cr);
@@ -1764,7 +1817,7 @@ lbool Solver::search_aux(int& nof_conflicts)
                 std::cout << "ci " << learnt_clause[0] << " l " << backtrack_level << "\n";
 #endif
             }
-            if (drup_file){
+            if (drup_file) {
 #ifdef BIN_DRUP
                 binDRUP('a', learnt_clause, drup_file);
 #else
@@ -1789,17 +1842,17 @@ lbool Solver::search_aux(int& nof_conflicts)
                            (int)max_learnts, nLearnts(), (double)learnts_literals/nLearnts(), progressEstimate()*100);
             }*/
             // the top_trail_soln should be update after each conflict
-            if(trail.size() > max_trail){
+            if (trail.size() > max_trail) {
                 max_trail = trail.size();
-                for(int idx_i=0; idx_i<nVars(); ++idx_i){
-                     lbool value_i = value(idx_i);
-                     if(value_i==l_Undef) top_trail_soln[idx_i] = !polarity[idx_i];
-                     else{
-                         top_trail_soln[idx_i] = value_i==l_True?1:0;
-                     }
+                for (int idx_i = 0; idx_i < nVars(); ++idx_i) {
+                    lbool value_i = value(idx_i);
+                    if (value_i == l_Undef) top_trail_soln[idx_i] = !polarity[idx_i];
+                    else {
+                        top_trail_soln[idx_i] = value_i == l_True ? 1 : 0;
+                    }
                 }
             }
-        }else{
+        } else {
 
             // NO_CONFLICT
 
@@ -1856,27 +1909,30 @@ lbool Solver::search_aux(int& nof_conflicts)
             bool restart = false;
             if (!VSIDS)
                 restart = nof_conflicts <= 0;
-            else if (!cached){
+            else if (!cached) {
                 restart = lbd_queue.full() && (lbd_queue.avg() * 0.8 > global_lbd_sum / conflicts_VSIDS);
                 cached = true;
             }
-            if (restart /*|| !withinBudget()*/){
+            if (restart /*|| !withinBudget()*/) {
                 lbd_queue.clear();
                 cached = false;
                 // Reached bound on number of conflicts:
                 cancelUntil(0);
-                return l_Undef; }
+                return l_Undef;
+            }
 
             // Simplify the set of problem clauses:
             if (decisionLevel() == 0 && !simplify())
                 return l_False;
 
-            if (conflicts >= next_T2_reduce){
+            if (conflicts >= next_T2_reduce) {
                 next_T2_reduce = conflicts + 10000;
-                reduceDB_Tier2(); }
-            if (conflicts >= next_L_reduce){
+                reduceDB_Tier2();
+            }
+            if (conflicts >= next_L_reduce) {
                 next_L_reduce = conflicts + 15000;
-                reduceDB(); }
+                reduceDB();
+            }
 
             Lit next = lit_Undef;
             /*while (decisionLevel() < assumptions.size()){
@@ -1922,7 +1978,6 @@ lbool Solver::search(int &nof_conflicts) {
     bool cached = false;
     starts++;
 
-    int conflictC = 0;
     vec<Lit> units;
 
     freeze_ls_restart_num--;
@@ -1948,41 +2003,42 @@ lbool Solver::search(int &nof_conflicts) {
 
     for (;;) {
 #ifdef MASSIVE
-        int flag;
-        do {
-            flag = 0;
-            for (int irank = 0; irank < size; irank++) {
-                if (irank != rank) {
-                    MPI_Status my_status;
-                    MPI_Iprobe(irank, MPI_ANY_TAG, MPI_COMM_WORLD, &flag, &my_status);
-                    if (flag) {
-                        MPI_Request recv_request;
-                        MPI_Status recv_status;
-                        int recv_buffer_len;
-                        MPI_Get_count(&my_status, MPI_INT, &recv_buffer_len);
-                        int recv_buffer[recv_buffer_len];
-                        MPI_Irecv(recv_buffer, recv_buffer_len, MPI_INT, my_status.MPI_SOURCE, my_status.MPI_TAG, MPI_COMM_WORLD, &recv_request);
-                        MPI_Wait(&recv_request, &recv_status);
-                        if (recv_buffer_len == 1) {
-                            if (value(toLit(recv_buffer[0])) == l_Undef) {
-                                uncheckedEnqueue(toLit(recv_buffer[0]));
+        //if (sharing_clauses) {
+            int flag;
+            do {
+                flag = 0;
+                for (int irank = 0; irank < size; irank++) {
+                    if (irank != rank) {
+                        MPI_Status my_status;
+                        MPI_Iprobe(irank, MPI_ANY_TAG, MPI_COMM_WORLD, &flag, &my_status);
+                        if (flag) {
+                            MPI_Request recv_request;
+                            MPI_Status recv_status;
+                            int recv_buffer_len;
+                            MPI_Get_count(&my_status, MPI_INT, &recv_buffer_len);
+                            int recv_buffer[recv_buffer_len];
+                            MPI_Irecv(recv_buffer, recv_buffer_len, MPI_INT, my_status.MPI_SOURCE, my_status.MPI_TAG, MPI_COMM_WORLD, &recv_request);
+                            MPI_Wait(&recv_request, &recv_status);
+                            if (recv_buffer_len == 1) {
+                                if (value(toLit(recv_buffer[0])) == l_Undef) {
+                                    uncheckedEnqueue(toLit(recv_buffer[0]));
+                                }
+                            } else {
+                                learnt_clause.clear();
+                                for (int i = 0; i < recv_buffer_len; i++) {
+                                    learnt_clause.push(toLit(recv_buffer[i]));
+                                }
+                                CRef cr = ca.alloc(learnt_clause, true);
+                                learnts_local.push(cr);
+                                attachClause(cr);
+                                claBumpActivity(ca[cr]);
                             }
-                        } else {
-                            learnt_clause.clear();
-                            for (int i = 0; i < recv_buffer_len; i++) {
-                                learnt_clause.push(toLit(recv_buffer[i]));
-                            }
-                            CRef cr = ca.alloc(learnt_clause, true);
-                            learnts_local.push(cr);
-                            attachClause(cr);
-                            claBumpActivity(ca[cr]);
                         }
                     }
                 }
-            }
-        } while (flag);
+            } while (flag);
+        //}
 #endif
-
         CRef confl = propagate();
 
         if (confl != CRef_Undef) {
@@ -2004,17 +2060,22 @@ lbool Solver::search(int &nof_conflicts) {
             }
 
             learnt_clause.clear();
-            if (conflicts > 50000)
-                DISTANCE = 0;
-            else
-                DISTANCE = 1;
-            if (VSIDS && DISTANCE)
-                collectFirstUIP(confl);
+            if (use_distance) {
+                if (conflicts > 50000)
+                    DISTANCE = 0;
+                else
+                    DISTANCE = 1;
+                if (VSIDS && DISTANCE)
+                    collectFirstUIP(confl);
+            } else {
+                if (VSIDS)
+                    collectFirstUIP(confl);
+            }
 
             analyze(confl, learnt_clause, backtrack_level, lbd);
 
 #ifdef MASSIVE
-            if (learnt_clause.size() <= nClauses() / nVars()) {
+            if (sharing_clauses && learnt_clause.size() <= filter) {
                 int buffer_len = learnt_clause.size();
                 int send_buffer[buffer_len];
                 MPI_Request my_request[size - 1];
@@ -2434,8 +2495,8 @@ lbool Solver::hess_first_order() {
 }
 
 void Solver::rand_init() {
-    for (int i = 0; i < nVars(); i++) {
-        polarity[i] = rand() % 2;
+    for (int i = 0; i < rank % nVars(); i++) {
+        polarity[i] = !polarity[i];
     }
 }
 
@@ -2449,12 +2510,17 @@ void inversion(int i, int j, std::vector<int> &seq) {
 
 // NOTE: assumptions passed in member-variable 'assumptions'.
 lbool Solver::solve_() {
+#ifdef MASSIVE
+    double gamma = rank; 
+    double epsilon = 1.0 / (1.0 + gamma);
+    int delta = gamma;
+#endif
     cursor = 0;
     hess_cursor = INT32_MAX;
     solved_by_hess = false;
     ls_ready = false;
 
-    seq.resize(13);
+    seq.resize(9);
     std::iota(seq.begin(), seq.end(), 0);
 
 #ifdef MASSIVE
@@ -2462,8 +2528,8 @@ lbool Solver::solve_() {
 #endif
 
     if (massive) {
-        seed = time(NULL) + time(NULL) * rank;
-        srand(seed);
+        //seed = time(NULL) + time(NULL) * rank;
+        //srand(seed);
         rand_init();
     }
 
@@ -2506,26 +2572,29 @@ lbool Solver::solve_() {
     int curr_restarts = 0;
     last_switch_conflicts = starts;
 
-    vec<Lit> learnt_clause;
-    vec<Lit> units;
     while (status == l_Undef) {
         uint64_t loc, glb = 0, tmp;
         for (int i = 0; i < seq.size(); i++) {
             for (int j = 0; j < seq.size(); j++) {
                 tmp = conflicts;
-                inversion(i, j, seq);
+                std::reverse(seq.begin() + std::min(i, j), seq.begin() + std::max(i, j));
                 global = 0;
                 if (boost_alternate) {
                     boost = !boost;
                 }
                 if (VSIDS) {
-                    int nof_conflicts = INT32_MAX;
-                    curr_restarts++;
-                    status = search_aux(nof_conflicts);
+                    int weighted = INT32_MAX;
+                    status = search(weighted);
                 } else {
+#ifdef MASSIVE
+                    int nof_conflicts = luby(restart_inc * epsilon, curr_restarts) * restart_first + delta;
+                    curr_restarts++;
+                    status = search(nof_conflicts);
+#else
                     int nof_conflicts = luby(restart_inc, curr_restarts) * restart_first;
                     curr_restarts++;
                     status = search(nof_conflicts);
+#endif
                 }
                 if (status != l_Undef) {
                     goto finally;
@@ -2535,7 +2604,7 @@ lbool Solver::solve_() {
                     glb = loc;
                     // std::cout << "c => " << glb << std::endl;
                 } else if (loc < glb) {
-                    inversion(i, j, seq);
+                    std::reverse(seq.begin() + std::min(i, j), seq.begin() + std::max(i, j));
                 }
                 if (propagations - curr_props > VSIDS_props_limit) {
                     curr_props = propagations;
@@ -2578,7 +2647,13 @@ lbool Solver::solve_() {
                         canceled.clear();
 #endif
                     }
+#ifdef MASSIVE
+                    last_switch_conflicts = luby(restart_inc * epsilon, curr_restarts) * starts + delta;
+                    epsilon += 1.0 / (1.0 + gamma);
+                    delta += gamma;
+#else
                     last_switch_conflicts = luby(restart_inc, curr_restarts) * starts;
+#endif
                 }
             }
         }
@@ -2808,7 +2883,7 @@ bool Solver::call_ls(bool use_up_build) {
     }
 
     for (int c = 0; c < ccnr.num_clauses; c++) {
-        for (LS::lit item : ccnr.clauses[c].literals) {
+        for (LS::lit item: ccnr.clauses[c].literals) {
             int v = item.var_num;
             ccnr.vars[v].literals.push_back(item);
         }

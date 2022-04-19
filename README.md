@@ -14,14 +14,12 @@
     c
     c       https://twitter.com/maxtuno
     c
-    c                [GRAVITY]
+    c                [SC-2022]
     c
 
 # News 2022
-I was rejected from participating in the SAT Competition 2022, because I am self-taught.
-This is the SLIME-Gravity code, the version with which I would participate in this competition.
-Here the report where it is clearly noted that it is better than Kissat MAB on a large scale.
-If you have a real problem, SLIME is your best option.
+
+This version of SLIME solve 80% of Crypto Track 2021 at 18000 seconds.
 
 <img src="https://raw.githubusercontent.com/maxtuno/SLIME/master/SLIME/report/kvs.png"/>
 

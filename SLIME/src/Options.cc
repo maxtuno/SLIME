@@ -23,20 +23,19 @@ OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWA
 
 using namespace SLIME;
 
-void SLIME::parseOptions(int& argc, char** argv, bool strict)
-{
+void SLIME::parseOptions(int &argc, char **argv, bool strict) {
     int i, j;
-    for (i = j = 1; i < argc; i++){
-        const char* str = argv[i];
-        if (match(str, "--") && match(str, Option::getHelpPrefixString()) && match(str, "help")){
+    for (i = j = 1; i < argc; i++) {
+        const char *str = argv[i];
+        if (match(str, "--") && match(str, Option::getHelpPrefixString()) && match(str, "help")) {
             if (*str == '\0')
                 printUsageAndExit(argc, argv);
             else if (match(str, "-verb"))
                 printUsageAndExit(argc, argv, true);
         } else {
             bool parsed_ok = false;
-        
-            for (int k = 0; !parsed_ok && k < Option::getOptionList().size(); k++){
+
+            for (int k = 0; !parsed_ok && k < Option::getOptionList().size(); k++) {
                 parsed_ok = Option::getOptionList()[k]->parse(argv[i]);
             }
 
@@ -54,22 +53,23 @@ void SLIME::parseOptions(int& argc, char** argv, bool strict)
 }
 
 
-void SLIME::setUsageHelp      (const char* str){ Option::getUsageString() = str; }
-void SLIME::setHelpPrefixStr  (const char* str){ Option::getHelpPrefixString() = str; }
-void SLIME::printUsageAndExit (int argc, char** argv, bool verbose)
-{
-    const char* usage = Option::getUsageString();
+void SLIME::setUsageHelp(const char *str) { Option::getUsageString() = str; }
+
+void SLIME::setHelpPrefixStr(const char *str) { Option::getHelpPrefixString() = str; }
+
+void SLIME::printUsageAndExit(int argc, char **argv, bool verbose) {
+    const char *usage = Option::getUsageString();
     if (usage != NULL)
         fprintf(stderr, usage, argv[0]);
 
     sort(Option::getOptionList(), Option::OptionLt());
 
-    const char* prev_cat  = NULL;
-    const char* prev_type = NULL;
+    const char *prev_cat = NULL;
+    const char *prev_type = NULL;
 
-    for (int i = 0; i < Option::getOptionList().size(); i++){
-        const char* cat  = Option::getOptionList()[i]->category;
-        const char* type = Option::getOptionList()[i]->type_name;
+    for (int i = 0; i < Option::getOptionList().size(); i++) {
+        const char *cat = Option::getOptionList()[i]->category;
+        const char *type = Option::getOptionList()[i]->type_name;
 
         if (cat != prev_cat)
             fprintf(stderr, "\n%s OPTIONS:\n\n", cat);
@@ -78,7 +78,7 @@ void SLIME::printUsageAndExit (int argc, char** argv, bool verbose)
 
         Option::getOptionList()[i]->help(verbose);
 
-        prev_cat  = Option::getOptionList()[i]->category;
+        prev_cat = Option::getOptionList()[i]->category;
         prev_type = Option::getOptionList()[i]->type_name;
     }
 

@@ -1,0 +1,73 @@
+\documentclass[conference]{IEEEtran}
+\IEEEoverridecommandlockouts
+% The preceding line is only needed to identify funding in the first footnote. If that is unneeded, please comment it out.
+\usepackage{cite}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{algorithmic}
+\usepackage{graphicx}
+\usepackage{textcomp}
+\usepackage{xcolor}
+\def\BibTeX{{\rm B\kern-.05em{\sc i\kern-.025em b}\kern-.08em
+    T\kern-.1667em\lower.7ex\hbox{E}\kern-.125emX}}
+\begin{document}
+
+\title{SLIME SAT Solver\\
+%{\footnotesize \textsuperscript{*}Note: Sub-titles are not captured in Xplore and should not be used}
+%\thanks{Thanks to all supporters of http://www.peqnp.com projects.}
+}
+
+\author{\IEEEauthorblockN{1\textsuperscript{st} Oscar Riveros}
+Santiago, Chile \\
+oscar.riveros@gmail.com
+}
+
+\maketitle
+
+\begin{abstract}
+A "on the fly" version of HESS algorithm for Multi-armed bandit style selection of rephasing, dual search algorithm, full remove of randomness on sequential and cloud version, based on SLIME sc2021 \cite{b1}.
+\end{abstract}
+
+\section{Introduction}
+We create an on the fly version of HESS \cite{b1} algorithm, this allow an optimization of the rephasing states.
+We create a dual search phase of the solver, one more simple and other more complex, this are called according if the VSIDS heuristic is running.
+The DISTANCE heuristic is now parametric, on the experiments, DISTANCE work well with cryptographic instances, but not with generics.
+For the cloud version the initial polarities are different for every node, on deterministic way, also the rank of the node is influencing on the execution.
+On this version is added an optional parameter for sharing learnt clauses between nodes, alternate sharing clauses, and a filter for the size of learnt shared.
+Several optimizations, and simplifications.
+\section{Methods}
+
+\subsection{HESS black-box algorithm}
+
+HESS black-box algorithm \cite{b1} of º2 order to approximate values from an Oracle, In this case a "On The Fly" oracle as execution of SLIME and the sequence used to maximize the selection of rephase heuristics like Multi-armed bandit algorithm.
+
+\subsection{HESS º2 order (On The Fly)}
+\begin{itemize}
+\item Create an initial sequence array $\rho(1, 2 \dots\ n)$
+\item Repeat to a final state.
+\item Set the current value to $\infty$.
+\item Set $i$ to 0 and $j$ to 0.
+\item increment $j$, if $j == n$ increment $i$ and put $j = 0$, if $i == n$, put $i = 0$ and $j = 0$. (two for loops)
+\item invert the array from $min(i, j)$ to $max(i, j)$
+\item Get $oracle()$ (call the search algorithm, and use the curren order of the array for select the bandit)
+    \begin{enumerate}
+        \item less than current value, reassign and retain the current assignment, and continue with next increment.
+        \item if greater, change the array to original state, and continue with next increment.
+        \item if equal, continue with next increment.
+    \end{enumerate}
+\item Continue with execution and repeat from step 2.
+\end{itemize}
+
+\subsection{Experimental Evaluation}
+
+The default version of SLIME solve the 80\% of the entire Crypto Track 2021 (a set of cryptography instances) at 18000 seconds at www.starexec.org cluster.
+
+\section{SLIME CLOUD}
+
+Consist on a MPI implementation of SLIME where all nodes compete for the solution, can generate certificates for UNSAT.
+
+\begin{thebibliography}{00}
+\bibitem{b1} Balyo , T , Froleyks , N , Heule , M , Iser , M , Järvisalo , M & Suda , M (eds) 2021 , Proceedings of SAT Competition 2021 : Solver and Benchmark Descriptions . Department of Computer Science Report Series B , vol. B-2021-1 , Department of Computer Science, University of Helsinki , Helsinki .
+\end{thebibliography}
+\vspace{12pt}
+
+\end{document}

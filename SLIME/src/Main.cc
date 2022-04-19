@@ -57,8 +57,10 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 using namespace SLIME;
 
 #if _WIN32 || _WIN64
+
 #include <io.h>
 #include <fcntl.h>
+
 void printHeader() {
     _setmode(_fileno(stdout), _O_U16TEXT);
     std::wcout << L"c                                         \n";
@@ -74,10 +76,11 @@ void printHeader() {
     std::wcout << L"c                                         \n";
     std::wcout << L"c       https://twitter.com/maxtuno       \n";
     std::wcout << L"c                                         \n";
-    std::wcout << L"c                [GRAVITY]                \n";
+    std::wcout << L"c                [SC-2022]                \n";
     std::wcout << L"c                                         \n";
     _setmode(_fileno(stdout), _O_TEXT);
 }
+
 #else
 
 void printHeader() {
@@ -94,7 +97,7 @@ void printHeader() {
     printf("c                                         \n");
     printf("c       https://twitter.com/maxtuno       \n");
     printf("c                                         \n");
-    printf("c                [GRAVITY]                \n");
+    printf("c                [SC-2022]                \n");
     printf("c                                         \n");
 }
 
@@ -150,10 +153,25 @@ int main(int argc, char *argv[]) {
 
     SimpSolver S;
 
-#ifdef MASSIVE    
+#ifdef MASSIVE
     MPI_Init(&argc, &argv);
     MPI_Comm_rank(MPI_COMM_WORLD, &S.rank);
     MPI_Comm_size(MPI_COMM_WORLD, &S.size);
+    if (S.rank % 4 == 0) {
+        S.use_distance = false;
+        S.invert_polarity = false;
+    } else if (S.rank % 4 == 1) {
+        S.use_distance = true;
+        S.invert_polarity = false;
+    }
+    else if (S.rank % 4 == 2) {
+        S.use_distance = false;
+        S.invert_polarity = true;
+    } else {
+        S.use_distance = true;
+        S.invert_polarity = true;
+    }
+2;
 #else
     S.rank = 0;
     S.size = 1;
@@ -203,7 +221,7 @@ int main(int argc, char *argv[]) {
 
     printf(result == l_True ? "s SATISFIABLE\nv " : result == l_False ? "s UNSATISFIABLE\n" : "s UNKNOWN\n");
     if (result == l_True) {
-        for (int i = 0; i < S.nVars(); i++) {        
+        for (int i = 0; i < S.nVars(); i++) {
             if (S.model[i] != l_Undef) {
                 printf("%s%s%d", (i == 0) ? "" : " ", (S.model[i] == l_True) ? "" : "-", i + 1);
             }
@@ -213,6 +231,7 @@ int main(int argc, char *argv[]) {
             }*/
         }
         printf(" 0\n");
+        fflush(stdout);
     } else {
 #ifdef DRAT
         if (argc > 2) {

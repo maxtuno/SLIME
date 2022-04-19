@@ -1,4 +1,7 @@
-/***************************************************************************************s
+/***************************************************************************************
+SLIME -- Copyright (c) 2022, Oscar Riveros, oscar.riveros@gmail.com,
+Santiago, Chile. https://github.com/maxtuno/SLIME
+
 SLIME -- Copyright (c) 2021, Oscar Riveros, oscar.riveros@sat-x.io,
 Santiago, Chile. https://github.com/maxtuno/SLIME
 
@@ -238,7 +241,7 @@ bool SimpSolver::strengthenClause(CRef cr, Lit l) {
         updateElimHeap(var(l));
     }
 
-    return c.size() != 1 || enqueue(c[0]) && propagate() == CRef_Undef;
+    return c.size() != 1 || (enqueue(c[0]) && propagate() == CRef_Undef);
 }
 
 
@@ -354,8 +357,7 @@ bool SimpSolver::implied(const vec<Lit> &c) {
 
 
 // Backward subsumption + backward subsumption resolution
-bool SimpSolver::backwardSubsumptionCheck(bool verbose) {
-    int cnt = 0;
+bool SimpSolver::backwardSubsumptionCheck() {
     int subsumed = 0;
     int deleted_literals = 0;
     assert(decisionLevel() == 0);
@@ -671,7 +673,7 @@ bool SimpSolver::eliminate_() {
         gatherTouchedClauses();
         // printf("  ## (time = %6.2f s) BWD-SUB: queue = %d, trail = %d\n", cpuTime(), subsumption_queue.size(), trail.size() - bwdsub_assigns);
         if ((subsumption_queue.size() > 0 || bwdsub_assigns < trail.size()) &&
-            !backwardSubsumptionCheck(true)) {
+            !backwardSubsumptionCheck()) {
             ok = false;
             goto cleanup;
         }

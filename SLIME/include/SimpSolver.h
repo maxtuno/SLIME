@@ -174,7 +174,7 @@ namespace SLIME {
 
         bool merge(const Clause &_ps, const Clause &_qs, Var v, int &size);
 
-        bool backwardSubsumptionCheck(bool verbose = false);
+        bool backwardSubsumptionCheck();
 
         bool eliminateVar(Var v);
 

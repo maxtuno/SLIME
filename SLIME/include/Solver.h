@@ -82,8 +82,13 @@ namespace SLIME {
 
     class Solver {
     public:
-        bool log, boost, boost_alternate, hess, massive, solved_by_hess, ls_ready, simplify_ready, render;
-        int global, cursor, rank, size, hess_cursor, hess_order, seed;
+        bool log{}, boost, boost_alternate, hess, massive, solved_by_hess{}, ls_ready{}, simplify_ready{}, render{}, use_distance, invert_polarity;
+        int global{}, cursor{}, rank{}, size{}, hess_cursor{}, hess_order;
+
+#ifdef MASSIVE
+        bool sharing_clauses, alternate_sharing;
+        int filter;
+#endif
 
         int oracle(int glb);
 
@@ -246,10 +251,10 @@ namespace SLIME {
         uint64_t chrono_backtrack, non_chrono_backtrack;
 
         // duplicate learnts version
-        uint64_t duplicates_added_conflicts;
-        uint64_t duplicates_added_tier2;
-        uint64_t duplicates_added_minimization;
-        uint64_t dupl_db_size;
+        uint64_t duplicates_added_conflicts{};
+        uint64_t duplicates_added_tier2{};
+        uint64_t duplicates_added_minimization{};
+        uint64_t dupl_db_size{};
 
         // duplicate learnts version
 
@@ -362,9 +367,9 @@ namespace SLIME {
         vec<uint64_t> seen2; // Mostly for efficient LBD computation. 'seen2[i]' will indicate if decision level or variable 'i' has been seen.
         uint64_t counter;    // Simple counter for marking purpose with 'seen2'.
 
-        double max_learnts;
-        double learntsize_adjust_confl;
-        int learntsize_adjust_cnt;
+        double max_learnts{};
+        double learntsize_adjust_confl{};
+        int learntsize_adjust_cnt{};
 
         // Main internal methods:
         //
@@ -450,7 +455,7 @@ namespace SLIME {
         static inline void byteDRUP(Lit l) {
             unsigned int u = 2 * (var(l) + 1) + sign(l);
             do {
-                *buf_ptr++ = u & 0x7f | 0x80;
+                *buf_ptr++ = (u & 0x7f) | 0x80;
                 buf_len++;
                 u = u >> 7;
             } while (u);
@@ -507,7 +512,7 @@ namespace SLIME {
 
         bool simplifyLearnt_tier2();
 
-        int trailRecord;
+        int trailRecord{};
 
         void cancelUntilTrailRecord();
 
@@ -516,7 +521,7 @@ namespace SLIME {
         CRef simplePropagate();
 
         uint64_t nbSimplifyAll;
-        uint64_t simplified_length_record, original_length_record;
+        uint64_t simplified_length_record{}, original_length_record{};
 
         vec<Lit> simp_learnt_clause;
         vec<CRef> simp_reason_clause;
@@ -592,7 +597,7 @@ namespace SLIME {
     inline int Solver::level(Var x) const { return vardata[x].level; }
 
     inline void Solver::insertVarOrder(Var x) {
-        Heap<VarOrderLt> &order_heap = DISTANCE ? order_heap_distance : ((!VSIDS) ? order_heap_CHB : order_heap_VSIDS);
+        Heap<VarOrderLt> &order_heap = use_distance ? (DISTANCE ? order_heap_distance : ((!VSIDS) ? order_heap_CHB : order_heap_VSIDS)) : ((!VSIDS) ? order_heap_CHB : order_heap_VSIDS);
         if (!order_heap.inHeap(x) && decision[x])
             order_heap.insert(x);
     }
@@ -679,7 +684,9 @@ namespace SLIME {
         if (b && !order_heap_CHB.inHeap(v)) {
             order_heap_CHB.insert(v);
             order_heap_VSIDS.insert(v);
-            order_heap_distance.insert(v);
+            if (use_distance) {
+                order_heap_distance.insert(v);
+            }
         }
     }
 
