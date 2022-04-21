@@ -96,8 +96,8 @@ static BoolOption opt_invert_polarity("POLARITY", "invert-polarity", "Specifies 
 
 
 #ifdef MASSIVE
-static BoolOption opt_alternate_sharing("MASSIVE", "alternate-sharing", "Specifies alternate sharing clauses on massive algorithm.", true);
-static BoolOption opt_sharing_clauses("MASSIVE", "sharing-clauses", "Specifies sharing clauses on massive algorithm.", true);
+static BoolOption opt_alternate_sharing("MASSIVE", "alternate-sharing", "Specifies alternate sharing clauses on massive algorithm.", false);
+static BoolOption opt_sharing_clauses("MASSIVE", "sharing-clauses", "Specifies sharing clauses on massive algorithm.", false);
 static IntOption opt_filter("MASSIVE", "filter", "Specifies the filter size for shared clauses.", 100, IntRange(1, INT32_MAX));
 #endif
 //=================================================================================================
