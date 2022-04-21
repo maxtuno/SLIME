@@ -25,8 +25,8 @@ This version of SLIME solve 80% of Crypto Track 2021 at 18000 seconds.
 
 ### Winner of Crypto Track and 3rd place on Cloud Track at the SAT Competition 2021 https://satcompetition.github.io/2021/
 <img src="https://raw.githubusercontent.com/maxtuno/SLIME/master/medals.jpeg"/>
-<img src="https://raw.githubusercontent.com/maxtuno/SLIME/master/doc/crypto.png"/>
-<img src="https://raw.githubusercontent.com/maxtuno/SLIME/master/doc/cloud.png"/>
+<img src="https://raw.githubusercontent.com/maxtuno/SLIME/master/doc/sc2021/crypto.png"/>
+<img src="https://raw.githubusercontent.com/maxtuno/SLIME/master/doc/sc2021/cloud.png"/>
 
 <img
   src="https://cr-ss-service.azurewebsites.net/api/ScreenShot?widget=summary&username=maxtuno&badges=2&show-avatar=true&style=--header-bg-color:%23000;--border-radius:10px"/>
