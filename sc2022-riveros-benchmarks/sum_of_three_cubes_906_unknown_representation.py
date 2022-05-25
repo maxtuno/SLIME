@@ -9,7 +9,7 @@ x = satx.integer()
 y = satx.integer()
 z = satx.integer()
 
-assert satx.one_of([x ** 3 - y ** 3 - z ** 3, x ** 3 + y ** 3 - z ** 3]) == 3
+assert satx.one_of([x ** 3 - y ** 3 - z ** 3, x ** 3 + y ** 3 - z ** 3]) == k
 
 assert x > 72054089679353378
 
