@@ -1,9 +1,9 @@
 import satx
 
-k = 44
+k = 42
 e = 80
 
-satx.engine(bits=3 * e, cnf_path='sum_of_three_cubes_44_unknown_representation.cnf', simplify=True, signed=True)
+satx.engine(bits=3 * e, cnf_path='sum_of_three_cubes_42_unknown_representation.cnf', simplify=True, signed=True)
 
 x = satx.integer()
 y = satx.integer()
