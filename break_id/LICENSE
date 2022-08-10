@@ -1,45 +1,4 @@
-SLIME -- Copyright (c) 2022, Oscar Riveros, oscar.riveros@gmail.com,
-Santiago, Chile. https://github.com/maxtuno/SLIME
-
-SLIME -- Copyright (c) 2021, Oscar Riveros, oscar.riveros@gmail.com,
-Santiago, Chile. https://github.com/maxtuno/SLIME
-
-DurianSat -- Copyright (c) 2020, Arijit Shaw, Kuldeep S. Meel
-
-SLIME -- Copyright (c) 2019, Oscar Riveros, oscar.riveros@gmail.com,
-Santiago, Chile. https://maxtuno.github.io/slime-sat-solver
-
-Maple_LCM_Dist_Chrono -- Copyright (c) 2018, Vadim Ryvchin, Alexander Nadel
-
-GlucoseNbSAT -- Copyright (c) 2016,Chu Min LI,Mao Luo and Fan Xiao
-                Huazhong University of science and technology, China
-                MIS, Univ. Picardie Jules Verne, France
-
-MapleSAT -- Copyright (c) 2016, Jia Hui Liang, Vijay Ganesh
-
-MiniSat -- Copyright (c) 2003-2006, Niklas Een, Niklas Sorensson
-           Copyright (c) 2007-2010  Niklas Sorensson
-
-Permission is hereby granted, free of charge, to any person obtaining a
-copy of this software and associated documentation files (the
-"Software", to deal in the Software without restriction, including
-without limitation the rights to use, copy, modify, merge, publish,
-distribute, sublicense, and/or sell copies of the Software, and to
-permit persons to whom the Software is furnished to do so, subject to
-the following conditions:
-
-The above copyright notice and this permission notice shall be included
-in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
-OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
-LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
-OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
-WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-
-For the files "saucy.hpp" and "saucy.cpp" the following license holds:
+For the files "saucy.h" and "saucy.c" the following license holds:
 
 COPYRIGHT (C) 2008
 THE REGENTS OF THE UNIVERSITY OF MICHIGAN
@@ -65,7 +24,7 @@ WITH RESPECT TO ANY CLAIM ARISING OUT OF OR IN CONNECTION WITH THE
 USE OF THE SOFTWARE, EVEN IF IT HAS BEEN OR IS HEREAFTER ADVISED OF
 THE POSSIBILITY OF SUCH DAMAGES.
 
-For all other source code files (on break_id folder), the following license holds:
+For all other source code files, the following license holds:
 
 Copyright 2010-2019 KU Leuven, Departement Computerwetenschappen,
 Celestijnenlaan 200A, B-3001 Leuven, Belgium
@@ -85,4 +44,5 @@ IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
 FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
 AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.

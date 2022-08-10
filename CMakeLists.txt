@@ -10,13 +10,33 @@ include_directories(. include)
 find_package(MPI REQUIRED)
 if (MPI_FOUND)
     set(CMAKE_CXX_COMPILER mpicxx)
-    set(CMAKE_CXX_FLAGS "-std=c++11 -O3 -mtune=generic -Wno-unused-value -D NDEBUG -D __STDC_LIMIT_MACROS -D __STDC_FORMAT_MACROS -D MASSIVE") # -D LOG
-    # set(CMAKE_CXX_FLAGS "-std=c++11 -O3 -mtune=generic -Wno-unused-value -D NDEBUG -D __STDC_LIMIT_MACROS -D __STDC_FORMAT_MACROS -D LOG -static")
+    set(CMAKE_CXX_FLAGS "-std=c++11 -O3 -mtune=generic -Wno-unused-value -D NDEBUG -D __STDC_LIMIT_MACROS -D __STDC_FORMAT_MACROS -D MASSIVE -D LOG")
+    add_executable(slime_cloud
+            src/Ls.cc
+            src/Main.cc
+            src/Options.cc
+            src/SimpSolver.cc
+            src/Solver.cc
+            break_id/saucy.cpp
+            break_id/global.cpp
+            break_id/Graph.cpp
+            break_id/Theory.cpp
+            break_id/Breaking.cpp
+            break_id/Algebraic.cpp
+            )
+else(MPI_FOUND)
+    set(CMAKE_CXX_FLAGS "-std=c++11 -O3 -mtune=generic -Wno-unused-value -D NDEBUG -D __STDC_LIMIT_MACROS -D __STDC_FORMAT_MACROS -D LOG -static")
     add_executable(slime
             src/Ls.cc
             src/Main.cc
             src/Options.cc
             src/SimpSolver.cc
             src/Solver.cc
+            break_id/saucy.cpp
+            break_id/global.cpp
+            break_id/Graph.cpp
+            break_id/Theory.cpp
+            break_id/Breaking.cpp
+            break_id/Algebraic.cpp
             )
 endif (MPI_FOUND)

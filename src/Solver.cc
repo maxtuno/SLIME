@@ -1864,8 +1864,20 @@ lbool Solver::search_aux(int &nof_conflicts) {
                     can_call_ls = false;
                     mediation_used = false;
                     freeze_ls_restart_num = restarts_gap;
-                    bool res = call_ls(true);
-
+                    bool res = false;
+                    if (hess) {
+                        if (hess_order == 1) {
+                            if (hess_first_order() == l_True) {
+                                res = true;
+                            }
+                        } else if (hess_order == 2) {
+                            if (hess_second_order() == l_True) {
+                                res = true;
+                            }
+                        }
+                    } else {
+                        res =  call_ls(true);
+                    }
                     if (res) {
                         solved_by_ls = true;
                         return l_True;
@@ -2214,9 +2226,20 @@ lbool Solver::search(int &nof_conflicts) {
 
                     can_call_ls = false;
                     mediation_used = false;
-                    freeze_ls_restart_num = restarts_gap;
-                    bool res = call_ls(true);
-
+                    bool res = false;
+                    if (hess) {
+                        if (hess_order == 1) {
+                            if (hess_first_order() == l_True) {
+                                res = true;
+                            }
+                        } else if (hess_order == 2) {
+                            if (hess_second_order() == l_True) {
+                                res = true;
+                            }
+                        }
+                    } else {
+                        res =  call_ls(true);
+                    }
                     if (res) {
                         solved_by_ls = true;
                         return l_True;
@@ -2365,7 +2388,10 @@ lbool Solver::hess_second_order() {
                 assigns[i] = neg(assigns[j]);
                 assigns[j] = tmp;
             }
-            loc = oracle(glb);
+            if (call_ls(false)) {
+                return l_True;
+            }
+            loc = ccnr.best_found_cost;
             if (loc < glb) {
                 glb = loc;
                 if (glb < hess_cursor) {
@@ -2439,7 +2465,10 @@ lbool Solver::hess_first_order() {
         bool done = true;
         for (int i = 0; i < nVars(); i++) {
             assigns[i] = neg(assigns[i]);
-            loc = oracle(glb);
+            if (call_ls(false)) {
+                return l_True;
+            }
+            loc = ccnr.best_found_cost;
             if (loc < glb) {
                 glb = loc;
                 if (glb < hess_cursor) {
@@ -2549,7 +2578,20 @@ lbool Solver::solve_() {
 
     add_tmp.clear();
 
-    int fls_res = call_ls(false);
+    int fls_res = 0;
+    if (hess) {
+        if (hess_order == 1) {
+            if (hess_first_order() == l_True) {
+                fls_res = true;
+            }
+        } else if (hess_order == 2) {
+            if (hess_second_order() == l_True) {
+                fls_res = true;
+            }
+        }
+    } else {
+        fls_res = call_ls(false);
+    }
     if (fls_res) {
         status = l_True;
     }
@@ -2628,14 +2670,6 @@ lbool Solver::solve_() {
                         ht[i[0]][i[1]][i[2]] = i[3];
                     }
                     dupl_db_size -= removed_duplicates;
-
-                    if (hess) {
-                        if (hess_order == 1) {
-                            hess_first_order();
-                        } else if (hess_order == 2) {
-                            hess_second_order();
-                        }
-                    }
                     if (VSIDS) {
                         VSIDS = false;
                     } else {
@@ -2715,12 +2749,12 @@ static Var mapVar(Var x, vec<Var> &map, Var &max) {
 }
 
 void Solver::toDimacs(FILE *f, Clause &c, vec<Var> &map, Var &max) {
-    // if (satisfied(c))
-    //    return;
+    if (satisfied(c))
+        return;
 
     for (int i = 0; i < c.size(); i++)
         if (value(c[i]) != l_False)
-            fprintf(f, "%s%d ", sign(c[i]) ? "-" : "", mapVar(var(c[i]), map, max) + 1);
+            fprintf(f, "%s%i ", sign(c[i]) ? "-" : "", mapVar(var(c[i]), map, max) + 1);
     fprintf(f, "0\n");
 }
 
@@ -2733,9 +2767,8 @@ void Solver::toDimacs(const char *file, const vec<Lit> &assumps) {
 }
 
 void Solver::toDimacs(FILE *f, const vec<Lit> &assumps) {
-    fprintf(f, "c PEQNP - www.peqnp.com\n");
-    fprintf(f, "c contact@peqnp.science\n");
-    fprintf(f, "c pip install PEQNP\n");
+    fprintf(f, "c SLIME SAT Solver\n");
+    fprintf(f, "c https://twitter.com/maxtuno\n");
 
     // Handle case when solver is in contradictory state:
     if (!ok) {
@@ -2748,29 +2781,27 @@ void Solver::toDimacs(FILE *f, const vec<Lit> &assumps) {
 
     // Cannot use removeClauses here because it is not safe
     // to deallocate them at this point. Could be improved.
-    // int cnt = 0;
-    // for (int i = 0; i < clauses.size(); i++)
-    //    if (!satisfied(ca[clauses[i]]))
-    //        cnt++;
+    int cnt = 0;
+    for (int i = 0; i < clauses.size(); i++)
+        if (!satisfied(ca[clauses[i]]))
+            cnt++;
 
-    for (int i = 0; i < clauses.size(); i++) {
-        // if (!satisfied(ca[clauses[i]])) {
-        Clause &c = ca[clauses[i]];
-        for (int j = 0; j < c.size(); j++) {
-            // if (value(c[j]) != l_False)
-            mapVar(var(c[j]), map, max);
+    for (int i = 0; i < clauses.size(); i++)
+        if (!satisfied(ca[clauses[i]])) {
+            Clause &c = ca[clauses[i]];
+            for (int j = 0; j < c.size(); j++)
+                if (value(c[j]) != l_False)
+                    mapVar(var(c[j]), map, max);
         }
-        // }
-    }
 
     // Assumptions are added as unit clauses:
-    // cnt += assumptions.size();
+    cnt += assumptions.size();
 
-    fprintf(f, "p cnf %d %d\n", max, assumptions.size() + clauses.size());
+    fprintf(f, "p cnf %i %i\n", max, cnt);
 
     for (int i = 0; i < assumptions.size(); i++) {
         assert(value(assumptions[i]) != l_False);
-        fprintf(f, "%s%d 0\n", sign(assumptions[i]) ? "-" : "", mapVar(var(assumptions[i]), map, max) + 1);
+        fprintf(f, "%s%i 0\n", sign(assumptions[i]) ? "-" : "", mapVar(var(assumptions[i]), map, max) + 1);
     }
 
     for (int i = 0; i < clauses.size(); i++)
@@ -3017,8 +3048,11 @@ bool Solver::call_ls(bool use_up_build) {
 
         // use total rand mod
         // call ccanr use rand assign
-        vector<char> *rand_signal = 0;
-        res = ccnr.local_search(rand_signal);
+        vector<char> signal;
+        for (int i{0}; i < assigns.size(); i++) {
+            signal.emplace_back(assigns[i] == l_True);
+        }
+        res = ccnr.local_search(&signal);
     }
 
     // int ls_var_nums = nVars();

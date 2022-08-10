@@ -1,2 +1,0 @@
-#!/bin/bash
-./slime ${1} -no-use-distance ${2}/proof.out
