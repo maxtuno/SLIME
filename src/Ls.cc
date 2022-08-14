@@ -54,7 +54,6 @@ bool ls::local_search(const vector<char> *init_solution) {
     best_found_cost = num_clauses;
     conflict_ct = vector<int>(num_vars + 10, 0);
     initialize(init_solution);
-    unsat_clauses.size();
     if (0 == unsat_clauses.size()) { return true; }
     for (step = 0; step < max_steps; step++) {
         if (mems > max_mems) {
