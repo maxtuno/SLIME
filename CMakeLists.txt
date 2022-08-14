@@ -7,8 +7,16 @@ set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/lib)
 
 include_directories(. include)
 
-find_package(MPI REQUIRED)
-if (MPI_FOUND)
+option(ENABLE_MPI "Enable MPI parallelization" OFF)
+
+set(CMAKE_CXX_STANDARD 14)
+
+if(ENABLE_MPI)
+    find_package(MPI REQUIRED)
+    include_directories(${MPI_INCLUDE_PATH})
+    set(CMAKE_C_FLAGS "${CMAKE_FLAGS} ${MPI_FLAGS}")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${MPI_CXX_FLAGS}")
+    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${MPI_EXE_LINKER_FLAGS}")
     add_executable(slime_cloud
             src/Ls.cc
             src/Main.cc
@@ -22,9 +30,8 @@ if (MPI_FOUND)
             break_id/Breaking.cpp
             break_id/Algebraic.cpp
             )
-    set(CMAKE_CXX_COMPILER "mpicxx")
-    target_compile_options(slime_cloud PRIVATE -std=c++14 -O3 -D MASSIVE -DLOG)
-endif (MPI_FOUND)
+    target_compile_options(slime_cloud PRIVATE -D MASSIVE -DLOG)
+endif(ENABLE_MPI)
 
 add_executable(slime
         src/Ls.cc
@@ -39,4 +46,4 @@ add_executable(slime
         break_id/Breaking.cpp
         break_id/Algebraic.cpp
         )
-target_compile_options(slime PUBLIC -std=c++14 -O3 -DLOG -static)
+target_compile_options(slime PUBLIC -DLOG -static)
