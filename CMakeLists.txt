@@ -13,24 +13,23 @@ set(CMAKE_CXX_STANDARD 14)
 
 if(ENABLE_MPI)
     find_package(MPI REQUIRED)
-    include_directories(${MPI_INCLUDE_PATH})
-    set(CMAKE_C_FLAGS "${CMAKE_FLAGS} ${MPI_FLAGS}")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${MPI_CXX_FLAGS}")
-    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${MPI_EXE_LINKER_FLAGS}")
-    add_executable(slime_cloud
-            src/Ls.cc
-            src/Main.cc
-            src/Options.cc
-            src/SimpSolver.cc
-            src/Solver.cc
-            break_id/saucy.cpp
-            break_id/global.cpp
-            break_id/Graph.cpp
-            break_id/Theory.cpp
-            break_id/Breaking.cpp
-            break_id/Algebraic.cpp
-            )
-    target_compile_options(slime_cloud PRIVATE -D MASSIVE -DLOG)
+    if (MPI_FOUND)
+        add_executable(slime_cloud
+                src/Ls.cc
+                src/Main.cc
+                src/Options.cc
+                src/SimpSolver.cc
+                src/Solver.cc
+                break_id/saucy.cpp
+                break_id/global.cpp
+                break_id/Graph.cpp
+                break_id/Theory.cpp
+                break_id/Breaking.cpp
+                break_id/Algebraic.cpp
+                )
+        set(CMAKE_CXX_COMPILER "mpicxx")
+        target_compile_options(slime_cloud PRIVATE -std=c++11 -O3 -D MASSIVE -DLOG)
+    endif(MPI_FOUND)
 endif(ENABLE_MPI)
 
 add_executable(slime
