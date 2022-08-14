@@ -75,9 +75,9 @@ void printHeader() {
     std::wcout << L"c ░  ░  ░    ░ ░    ▒ ░░      ░      ░    \n";
     std::wcout << L"c       ░      ░  ░ ░         ░      ░  ░ \n";
     std::wcout << L"c                                         \n";
-    std::wcout << L"c       https://twitter.com/maxtuno       \n";
+    std::wcout << L"c              Oscar Riveros              \n";
     std::wcout << L"c                                         \n";
-    std::wcout << L"c                [SC-2022]                \n";
+    std::wcout << L"c               [BREAK-ID]                \n";
     std::wcout << L"c                                         \n";
     _setmode(_fileno(stdout), _O_TEXT);
 }
