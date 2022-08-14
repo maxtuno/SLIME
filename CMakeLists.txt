@@ -9,8 +9,6 @@ include_directories(. include)
 
 find_package(MPI REQUIRED)
 if (MPI_FOUND)
-    set(CMAKE_CXX_COMPILER mpicxx)
-    set(CMAKE_CXX_FLAGS "-std=c++11 -O3 -D NDEBUG -D __STDC_LIMIT_MACROS -D __STDC_FORMAT_MACROS -D MASSIVE -D LOG")
     add_executable(slime_cloud
             src/Ls.cc
             src/Main.cc
@@ -24,19 +22,21 @@ if (MPI_FOUND)
             break_id/Breaking.cpp
             break_id/Algebraic.cpp
             )
-else(MPI_FOUND)
-    set(CMAKE_CXX_FLAGS "-std=c++11 -O3 -D NDEBUG -D __STDC_LIMIT_MACROS -D __STDC_FORMAT_MACROS -D LOG -static")
-    add_executable(slime
-            src/Ls.cc
-            src/Main.cc
-            src/Options.cc
-            src/SimpSolver.cc
-            src/Solver.cc
-            break_id/saucy.cpp
-            break_id/global.cpp
-            break_id/Graph.cpp
-            break_id/Theory.cpp
-            break_id/Breaking.cpp
-            break_id/Algebraic.cpp
-            )
+    set(CMAKE_CXX_COMPILER "mpicxx")
+    target_compile_options(slime_cloud PRIVATE -std=c++14 -O3 -D MASSIVE -DLOG)
 endif (MPI_FOUND)
+
+add_executable(slime
+        src/Ls.cc
+        src/Main.cc
+        src/Options.cc
+        src/SimpSolver.cc
+        src/Solver.cc
+        break_id/saucy.cpp
+        break_id/global.cpp
+        break_id/Graph.cpp
+        break_id/Theory.cpp
+        break_id/Breaking.cpp
+        break_id/Algebraic.cpp
+        )
+target_compile_options(slime PUBLIC -std=c++14 -O3 -DLOG -static)

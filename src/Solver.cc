@@ -2626,7 +2626,7 @@ lbool Solver::solve_() {
                 }
                 if (VSIDS) {
                     int weighted = INT32_MAX;
-                    status = search(weighted);
+                    status = search_aux(weighted);
                 } else {
 #ifdef MASSIVE
                     int nof_conflicts = luby(restart_inc * epsilon, curr_restarts) * restart_first + delta;
