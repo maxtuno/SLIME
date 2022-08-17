@@ -1,6 +1,8 @@
 # SLIME Cloud 
 ## A Free Massive World Class High Performance SAT Solver.
 
+### Try the [SLIME DEEP LEARNING](https://github.com/maxtuno/SLIME/tree/master/variations).
+
     c
     c   ██████  ██▓     ██▓ ███▄ ▄███▓▓█████
     c ▒██    ▒ ▓██▒    ▓██▒▓██▒▀█▀ ██▒▓█   ▀
