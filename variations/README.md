@@ -1,9 +1,15 @@
 # SLIME + DEEP LEARNING. 
 
-    usage : slime-deep-learning > LICENSE
-    usage : slime-deep-learning <cnf-instance>
-    usage : slime-deep-learning <cnf-instance> <unsat-proof>
-    usage : slime-deep-learning <cnf-instance> <unsat-proof> <sat-model>
+  This is a linux executable, to give it execute permissions do 
+  
+    chmod 777 slime-deep-learning
+    
+  USAGE  
+
+    slime-deep-learning > LICENSE
+    slime-deep-learning <cnf-instance>
+    slime-deep-learning <cnf-instance> <unsat-proof>
+    slime-deep-learning <cnf-instance> <unsat-proof> <sat-model>
 
   EXAMPLE 
   
