@@ -5,7 +5,9 @@
     usage : slime-deep-learning <cnf-instance> <unsat-proof>
     usage : slime-deep-learning <cnf-instance> <unsat-proof> <sat-model>
 
-example : slime-deep-learning -no-cryptography -learning-rate=0.001 -max-iter=10 instance.cnf instance.proof instance.model
+  EXAMPLE 
+  
+    slime-deep-learning -no-cryptography -learning-rate=0.001 -max-iter=10 instance.cnf instance.proof instance.model
 
   BOOST OPTIONS:
 
