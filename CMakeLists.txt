@@ -27,7 +27,7 @@ if(ENABLE_MPI)
                 break_id/Breaking.cpp
                 break_id/Algebraic.cpp
                 )
-        set(CMAKE_CXX_COMPILER "mpicxx")
+        set(CMAKE_CXX_COMPILER mpicxx)
         target_compile_options(slime_cloud PRIVATE -std=c++11 -O3 -D MASSIVE -DLOG)
     endif(MPI_FOUND)
 endif(ENABLE_MPI)
