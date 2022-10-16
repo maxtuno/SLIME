@@ -299,6 +299,8 @@ int break_id_to_slime(const string &file_name, const string &file_proof, SLIME::
     if (!file_proof.empty()) {
         logfile = file_proof;
         logging = true;
+        useBinaryClauses = false;
+        useShatterTranslation = false;
         logstream.open(logfile, ios::app);
         if (logstream.fail()) {
             gracefulError("Could not write to " + logfile);

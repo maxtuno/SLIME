@@ -18,11 +18,11 @@ time_t startTime;
 
 
 // OPTIONS:
-bool logging = false;
-bool useMatrixDetection = true;
-bool useBinaryClauses = false;
+bool logging = true;
+bool useMatrixDetection = false;
+bool useBinaryClauses = true;
 bool onlyPrintBreakers = false;
-bool useShatterTranslation = false;
+bool useShatterTranslation = true;
 bool useFullTranslation = true;
 int symBreakingFormLength = INT_MAX;
 bool aspinput = false;

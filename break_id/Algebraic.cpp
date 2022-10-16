@@ -5,7 +5,7 @@
 #include "Theory.hpp"
 #include "Breaking.hpp"
 #include "Graph.hpp"
-#include "Solver.h"
+#include "SimpSolver.h"
 
 #include <stdio.h>
 #include <limits.h>

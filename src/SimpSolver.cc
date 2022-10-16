@@ -590,11 +590,7 @@ bool SimpSolver::eliminate(bool turn_off_elim) {
     if (nVars() == 0) goto cleanup; // User disabling preprocessing.
 
     // Get an initial number of clauses (more accurately).
-    if (trail.size() != 0) removeSatisfied();
     n_cls_init = nClauses();
-
-    res = eliminate_(); // The first, usual variable elimination of MiniSat.
-    if (!res) goto cleanup;
 
     n_cls = nClauses();
     n_vars = nFreeVars();
@@ -605,6 +601,16 @@ bool SimpSolver::eliminate(bool turn_off_elim) {
 
     grow++;
     for (; grow < INT32_MAX; grow++) {
+
+        int n_cls_last = nClauses();
+        int n_vars_last = nFreeVars();
+
+        iter++;
+
+        res = eliminate_();
+        if (!res || n_vars_last == nFreeVars()) {
+            break;
+        }
         // Rebuild elimination variable heap.
         for (int i = 0; i < clauses.size(); i++) {
             const Clause &c = ca[clauses[i]];
@@ -614,13 +620,6 @@ bool SimpSolver::eliminate(bool turn_off_elim) {
                 else
                     elim_heap.update(var(c[j]));
         }
-
-        int n_cls_last = nClauses();
-        int n_vars_last = nFreeVars();
-
-        res = eliminate_();
-        if (!res || n_vars_last == nFreeVars()) break;
-        iter++;
 
         int n_cls_now = nClauses();
         int n_vars_now = nFreeVars();
@@ -640,6 +639,7 @@ bool SimpSolver::eliminate(bool turn_off_elim) {
     }
 
     cleanup:
+    if (trail.size() != 0) removeSatisfied();
     touched.clear(true);
     occurs.clear(true);
     n_occ.clear(true);

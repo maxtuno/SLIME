@@ -5,33 +5,12 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/bin)
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/lib)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/lib)
 
-include_directories(. include)
+include_directories(.
+        include
+        3rd
+        )
 
-option(ENABLE_MPI "Enable MPI parallelization" OFF)
-
-set(CMAKE_CXX_STANDARD 14)
-
-if(ENABLE_MPI)
-    find_package(MPI REQUIRED)
-    if (MPI_FOUND)
-        add_executable(slime_cloud
-                src/Ls.cc
-                src/Main.cc
-                src/Options.cc
-                src/SimpSolver.cc
-                src/Solver.cc
-                break_id/saucy.cpp
-                break_id/global.cpp
-                break_id/Graph.cpp
-                break_id/Theory.cpp
-                break_id/Breaking.cpp
-                break_id/Algebraic.cpp
-                )
-        set(CMAKE_CXX_COMPILER mpicxx)
-        target_compile_options(slime_cloud PRIVATE -std=c++11 -O3 -D MASSIVE -DLOG)
-    endif(MPI_FOUND)
-endif(ENABLE_MPI)
-
+set(CMAKE_CXX_FLAGS "-std=c++17 -mtune=generic -D LOG -static")
 add_executable(slime
         src/Ls.cc
         src/Main.cc
@@ -45,4 +24,22 @@ add_executable(slime
         break_id/Breaking.cpp
         break_id/Algebraic.cpp
         )
-target_compile_options(slime PUBLIC -DLOG -static)
+
+# find_package(MPI REQUIRED)
+# if (MPI_FOUND)
+#     set(CMAKE_CXX_COMPILER mpicxx)
+#     set(CMAKE_CXX_FLAGS "-std=c++17 -D LOG -D MASSIVE")
+#     add_executable(slime
+#             src/Ls.cc
+#             src/Main.cc
+#             src/Options.cc
+#             src/SimpSolver.cc
+#             src/Solver.cc
+#             break_id/saucy.cpp
+#             break_id/global.cpp
+#             break_id/Graph.cpp
+#             break_id/Theory.cpp
+#             break_id/Breaking.cpp
+#             break_id/Algebraic.cpp
+#             )
+# endif (MPI_FOUND)

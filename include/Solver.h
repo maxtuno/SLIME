@@ -68,7 +68,10 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include <unordered_set>
 #include <vector>
 #include <numeric>
+#include <cmath>
 // duplicate learnts version
+
+#include <dezero/dezero.hpp>
 
 // Don't change the actual numbers.
 #define LOCAL 0
@@ -77,20 +80,36 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 namespace SLIME {
 
+    class Neural : public dz::models::Model {
+    public:
+        Neural(const std::size_t &hidden_size, const std::size_t &output_size) {
+            this->prop("l1") = std::make_shared<L::Linear>(hidden_size);
+            this->prop("l2") = std::make_shared<L::Linear>(output_size);
+        }
+
+        dz::VariablePtrList forward(const dz::VariablePtrList &xs) override {
+            auto y = this->layer("l1")(xs);
+            y = dz::functions::sigmoid(y);
+            y = this->layer("l2")(y);
+            return dz::functions::tanh(y);
+        }
+    };
+
 //=================================================================================================
 // Solver -- the main class:
 
     class Solver {
     public:
-        bool log{}, boost, boost_alternate, hess, massive, solved_by_hess{}, ls_ready{}, simplify_ready{}, render{}, use_distance, invert_polarity;
-        int global{}, cursor{}, rank{}, size{}, hess_cursor{}, hess_order;
+        bool log{}, boost, boost_alternate, hess, massive, solved_by_hess{}, ls_ready{}, simplify_ready{}, render{}, use_distance, invert_polarity, crypto{};
+        int global{}, cursor{}, rank{}, size{}, hess_cursor{}, hess_order{};
+        double  global_neural{};
 
 #ifdef MASSIVE
         bool sharing_clauses, alternate_sharing;
         int filter;
 #endif
 
-        int oracle(int glb);
+        double oracle(int glb);
 
         lbool hess_first_order();
 
@@ -101,6 +120,16 @@ namespace SLIME {
         void rand_init();
 
         vec<lbool> aux;
+
+        std::vector<double> c;
+
+        std::vector<double> apply_deep(std::vector<double> &a, Neural &neural, Neural &neural_top);
+
+        dz::data_t lr = 0.01;
+        std::size_t max_iter = 1;
+
+        lbool solve_();
+
     private:
         template<typename T>
         class MyQueue {
@@ -383,9 +412,9 @@ namespace SLIME {
         void analyze(CRef confl, vec<Lit> &out_learnt, int &out_btlevel, int &out_lbd); // (bt = backtrack)
         void analyzeFinal(Lit p, vec<Lit> &out_conflict);                               // COULD THIS BE IMPLEMENTED BY THE ORDINARIY "analyze" BY SOME REASONABLE GENERALIZATION?
         bool litRedundant(Lit p, uint32_t abstract_levels);                             // (helper method for 'analyze()')
-        lbool search(int &nof_conflicts);                                               // Search for a given number of conflicts.
-        lbool search_aux(int &nof_conflicts);                                               // Search for a given number of conflicts.
-        lbool solve_();                                                                 // Main solve method (assumptions given in 'assumptions').
+        lbool search(int &nof_conflicts, Neural &neural, Neural &neural_top);                               // Search for a given number of conflicts.
+        lbool search_aux(int &nof_conflicts, Neural &neural, Neural &neural_top);                           // Search for a given number of conflicts.
+        // Main solve method (assumptions given in 'assumptions').
         void reduceDB();                                                                // Reduce the set of learnt clauses.
         void reduceDB_Tier2();
 
