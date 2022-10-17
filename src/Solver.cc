@@ -94,7 +94,7 @@ static BoolOption opt_invert_polarity("POLARITY", "invert-polarity", "Specifies 
 static DoubleOption opt_learning_rate("DEEP-LEARNING", "learning-rate", "specifies the learning rate for the training algorithm.", 0.001, DoubleRange(0, false, HUGE_VAL, false));
 static IntOption opt_max_iter("DEEP-LEARNING", "max-iter", "specifies the number of iterations for the training algorithm on each call.", 1, IntRange(0, INT32_MAX));
 
-static BoolOption opt_crypto("CRYPTOGRAPHY", "cryptography", "Specifies the use of CRYPTOGRAPHY optimizations.", false);
+static BoolOption opt_crypto("CRYPTOGRAPHY", "cryptography", "Specifies the use of CRYPTOGRAPHY optimizations.", true);
 
 #ifdef MASSIVE
 static BoolOption opt_alternate_sharing("MASSIVE", "alternate-sharing", "Specifies alternate sharing clauses on massive algorithm.", true);
