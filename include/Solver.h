@@ -613,7 +613,7 @@ namespace SLIME {
 
         std::vector<int> seq;
 
-        void rand_based_rephase(std::vector<int> &seq);
+        void rand_based_rephase(std::vector<int> &seq, Neural &neural);
 
         void info_based_rephase();
     };

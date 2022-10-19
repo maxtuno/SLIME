@@ -1609,7 +1609,7 @@ void Solver::info_based_rephase() {
     }
 }
 
-void Solver::rand_based_rephase(std::vector<int> &seq) {
+void Solver::rand_based_rephase(std::vector<int> &seq, Neural &neural) {
     int var_nums = nVars();
     // local search
     if (seq[0] == 0) {
@@ -1650,6 +1650,14 @@ void Solver::rand_based_rephase(std::vector<int> &seq) {
         // 50
     else {
         // do nothing
+        c.resize(polarity.size());
+        for (auto i{0}; i < polarity.size(); i++) {
+            c[i] = polarity[i];
+        }
+        auto prediction = apply_deep(c, neural, oracle(0));
+        for (auto i{0}; i < prediction.size(); i++) {
+            polarity[i] = prediction[i] > 0.0;
+        }
     }
 }
 
@@ -1663,12 +1671,11 @@ lbool Solver::search_aux(int &nof_conflicts, Neural &neural) {
 
     freeze_ls_restart_num--;
     bool can_call_ls = true;
-
     if (ls_ready && starts > state_change_time) {
         if (conflicts % 2 == 0)
             info_based_rephase();
         else
-            rand_based_rephase(seq);
+            rand_based_rephase(seq, neural);
     }
     // simplify
     //
@@ -1995,11 +2002,12 @@ lbool Solver::search(int &nof_conflicts, Neural &neural) {
     freeze_ls_restart_num--;
     bool can_call_ls = true;
 
+
     if (ls_ready && starts > state_change_time) {
         if (conflicts % 2 == 0)
             info_based_rephase();
         else
-            rand_based_rephase(seq);
+            rand_based_rephase(seq, neural);
     }
         /*else if (conflicts % 2 == 0) {
         c.resize(polarity.size());
@@ -2569,7 +2577,7 @@ lbool Solver::solve_() {
     solved_by_hess = false;
     ls_ready = false;
 
-    seq.resize(9);
+    seq.resize(10);
     std::iota(seq.begin(), seq.end(), 0);
 
 #ifdef MASSIVE
@@ -2671,15 +2679,6 @@ lbool Solver::solve_() {
                     // std::cout << "c => " << glb << std::endl;
                 } else if (loc < glb) {
                     std::reverse(seq.begin() + std::min(i, j), seq.begin() + std::max(i, j));
-                } else {
-                    c.resize(polarity.size());
-                    for (auto i{0}; i < polarity.size(); i++) {
-                        c[i] = polarity[i];
-                    }
-                    auto prediction = apply_deep(c, neural, std::log(1 + loc));
-                    for (auto i{0}; i < prediction.size(); i++) {
-                        polarity[i] = prediction[i] > 0.0;
-                    }
                 }
                 if (propagations - curr_props > VSIDS_props_limit) {
                     curr_props = propagations;
