@@ -89,7 +89,7 @@ namespace SLIME {
 
         dz::VariablePtrList forward(const dz::VariablePtrList &xs) override {
             auto y = this->layer("l1")(xs);
-            y = dz::functions::sigmoid(y);
+            y = dz::functions::softmax(y);
             y = this->layer("l2")(y);
             return dz::functions::tanh(y);
         }
@@ -123,7 +123,7 @@ namespace SLIME {
 
         std::vector<double> c;
 
-        std::vector<double> apply_deep(std::vector<double> &a, Neural &neural, Neural &neural_top);
+        std::vector<double> apply_deep(std::vector<double> &a, Neural &neural);
 
         dz::data_t lr = 0.01;
         std::size_t max_iter = 1;
@@ -412,8 +412,8 @@ namespace SLIME {
         void analyze(CRef confl, vec<Lit> &out_learnt, int &out_btlevel, int &out_lbd); // (bt = backtrack)
         void analyzeFinal(Lit p, vec<Lit> &out_conflict);                               // COULD THIS BE IMPLEMENTED BY THE ORDINARIY "analyze" BY SOME REASONABLE GENERALIZATION?
         bool litRedundant(Lit p, uint32_t abstract_levels);                             // (helper method for 'analyze()')
-        lbool search(int &nof_conflicts, Neural &neural, Neural &neural_top);                               // Search for a given number of conflicts.
-        lbool search_aux(int &nof_conflicts, Neural &neural, Neural &neural_top);                           // Search for a given number of conflicts.
+        lbool search(int &nof_conflicts, Neural &neural);                               // Search for a given number of conflicts.
+        lbool search_aux(int &nof_conflicts, Neural &neural);                           // Search for a given number of conflicts.
         // Main solve method (assumptions given in 'assumptions').
         void reduceDB();                                                                // Reduce the set of learnt clauses.
         void reduceDB_Tier2();

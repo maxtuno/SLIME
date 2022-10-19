@@ -19,7 +19,7 @@ time_t startTime;
 
 // OPTIONS:
 bool logging = true;
-bool useMatrixDetection = false;
+bool useMatrixDetection = true;
 bool useBinaryClauses = true;
 bool onlyPrintBreakers = false;
 bool useShatterTranslation = true;

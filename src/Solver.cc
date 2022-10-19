@@ -1653,7 +1653,7 @@ void Solver::rand_based_rephase(std::vector<int> &seq) {
     }
 }
 
-lbool Solver::search_aux(int &nof_conflicts, Neural &neural, Neural &neural_top) {
+lbool Solver::search_aux(int &nof_conflicts, Neural &neural) {
     assert(ok);
     int backtrack_level;
     int lbd;
@@ -1664,25 +1664,24 @@ lbool Solver::search_aux(int &nof_conflicts, Neural &neural, Neural &neural_top)
     freeze_ls_restart_num--;
     bool can_call_ls = true;
 
-    if (ls_ready && starts > state_change_time) {
-        if (conflicts % 3 == 0)
+   //if (/*ls_ready && */starts > state_change_time) {
+        /*if (conflicts % 3 == 0)
             info_based_rephase();
         else if (conflicts % 5 == 0)
             rand_based_rephase(seq);
-        else if (conflicts % 7 == 0) {
-            c.resize(polarity.size());
-            for (auto i{0}; i < polarity.size(); i++) {
-                c[i] = polarity[i];
-            }
-            auto prediction = apply_deep(c, neural, neural_top);
-            if (solved_by_ls) {
-                return l_True;
-            }
-            for (auto i{0}; i < prediction.size(); i++) {
-                polarity[i] = prediction[i] >= 0.5;
-            }
+        else if (conflicts % 2 == 0) {*/
+        c.resize(polarity.size());
+        for (auto i{0}; i < polarity.size(); i++) {
+            c[i] = polarity[i];
         }
-    }
+        auto prediction = apply_deep(c, neural);
+        if (solved_by_ls) {
+            return l_True;
+        }
+        for (auto i{0}; i < prediction.size(); i++) {
+            polarity[i] = prediction[i] > 0.0;
+        }
+    //}
     // simplify
     //
     if (conflicts >= curSimplify * nbconfbeforesimplify) {
@@ -1995,7 +1994,7 @@ lbool Solver::search_aux(int &nof_conflicts, Neural &neural, Neural &neural_top)
     }
 }
 
-lbool Solver::search(int &nof_conflicts, Neural &neural, Neural &neural_top) {
+lbool Solver::search(int &nof_conflicts, Neural &neural) {
     assert(ok);
     int backtrack_level;
     int lbd;
@@ -2008,25 +2007,25 @@ lbool Solver::search(int &nof_conflicts, Neural &neural, Neural &neural_top) {
     freeze_ls_restart_num--;
     bool can_call_ls = true;
 
-    if (ls_ready && starts > state_change_time) {
-        if (conflicts % 3 == 0)
-            info_based_rephase();
-        else if (conflicts % 5 == 0)
-            rand_based_rephase(seq);
-        else if (conflicts % 7 == 0) {
-            c.resize(polarity.size());
-            for (auto i{0}; i < polarity.size(); i++) {
-                c[i] = polarity[i];
-            }
-            auto prediction = apply_deep(c, neural, neural_top);
-            if (solved_by_ls) {
-                return l_True;
-            }
-            for (auto i{0}; i < prediction.size(); i++) {
-                polarity[i] = prediction[i] >= 0.5;
-            }
+    //if (/*ls_ready && */starts > state_change_time) {
+    /*if (conflicts % 3 == 0)
+        info_based_rephase();
+    else if (conflicts % 5 == 0)
+        rand_based_rephase(seq);
+    else if (conflicts % 2 == 0) {*/
+        c.resize(polarity.size());
+        for (auto i{0}; i < polarity.size(); i++) {
+            c[i] = polarity[i];
         }
-    }
+        auto prediction = apply_deep(c, neural);
+        if (solved_by_ls) {
+            return l_True;
+        }
+        for (auto i{0}; i < prediction.size(); i++) {
+            polarity[i] = prediction[i] > 0.0;
+        }
+    //}
+    //}
 
     // simplify
     //
@@ -2569,7 +2568,6 @@ lbool Solver::solve_() {
     std::size_t output_size = nVars();
 
     auto neural = Neural(hidden_size, output_size);
-    auto neural_top = Neural(hidden_size, output_size);
 
 #ifdef MASSIVE
     double gamma = rank; 
@@ -2633,7 +2631,7 @@ lbool Solver::solve_() {
 
     VSIDS = true;
     while (status == l_Undef && init > 0)
-        status = search(init, neural, neural_top);
+        status = search(init, neural);
     VSIDS = false;
 
     duplicates_added_conflicts = 0;
@@ -2660,19 +2658,19 @@ lbool Solver::solve_() {
                 if (VSIDS) {
                     int weighted = INT32_MAX;
                     if (crypto) {
-                        status = search(weighted, neural, neural_top);
+                        status = search(weighted, neural);
                     } else {
-                        status = search_aux(weighted, neural, neural_top);
+                        status = search_aux(weighted, neural);
                     }
                 } else {
 #ifdef MASSIVE
                     int nof_conflicts = luby(restart_inc * epsilon, curr_restarts) * restart_first + delta;
                     curr_restarts++;
-                    status = search(nof_conflicts, neural, neural_top);
+                    status = search(nof_conflicts, neural);
 #else
                     int nof_conflicts = luby(restart_inc, curr_restarts) * restart_first;
                     curr_restarts++;
-                    status = search(nof_conflicts, neural, neural_top);
+                    status = search(nof_conflicts, neural);
 #endif
                 }
                 if (status != l_Undef) {
@@ -3111,7 +3109,7 @@ bool Solver::call_ls(bool use_up_build) {
     return res;
 }
 
-std::vector<double> Solver::apply_deep(std::vector<double> &a, Neural &neural, Neural &neural_top) {
+std::vector<double> Solver::apply_deep(std::vector<double> &a, Neural &neural) {
     auto x = dz::as_variable(dz::as_array(nc::asarray(a)));
     std::vector<double> prediction;
     assigns.copyTo(aux);
@@ -3119,10 +3117,10 @@ std::vector<double> Solver::apply_deep(std::vector<double> &a, Neural &neural, N
         auto y_pred = neural(x).front();
         prediction.assign(y_pred->data->begin(), y_pred->data->end());
         for (int j = 0; j < nVars(); j++) {
-            assigns[j] = prediction[j] >= 0 ? l_True : l_False;
+            assigns[j] = prediction[j] > 0 ? l_True : l_False;
         }
         auto local = oracle(0);
-        auto loss = F::mean_squared_error(x, y_pred) + local;
+        auto loss = F::mean_squared_error(x, y_pred) * local;
 
         neural.cleargrads();
         loss->backward();
@@ -3134,7 +3132,6 @@ std::vector<double> Solver::apply_deep(std::vector<double> &a, Neural &neural, N
         auto local_neural = loss->data->at(0);
         if (local_neural < global_neural) {
             global_neural = local_neural;
-            neural_top.params() = neural.params();
             if (log) {
                 if (massive) {
                     std::cout << "\rc Loss [" << rank << "] : " << loss << "        ";
@@ -3143,8 +3140,6 @@ std::vector<double> Solver::apply_deep(std::vector<double> &a, Neural &neural, N
                 }
                 std::flush(std::cout);
             }
-        } else if (local_neural > global_neural) {
-            neural.params() = neural_top.params();
         }
 
         if (local == 0) {
