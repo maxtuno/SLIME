@@ -1664,24 +1664,12 @@ lbool Solver::search_aux(int &nof_conflicts, Neural &neural) {
     freeze_ls_restart_num--;
     bool can_call_ls = true;
 
-   //if (/*ls_ready && */starts > state_change_time) {
-        /*if (conflicts % 3 == 0)
+    if (ls_ready && starts > state_change_time) {
+        if (conflicts % 2 == 0)
             info_based_rephase();
-        else if (conflicts % 5 == 0)
+        else
             rand_based_rephase(seq);
-        else if (conflicts % 2 == 0) {*/
-        c.resize(polarity.size());
-        for (auto i{0}; i < polarity.size(); i++) {
-            c[i] = polarity[i];
-        }
-        auto prediction = apply_deep(c, neural);
-        if (solved_by_ls) {
-            return l_True;
-        }
-        for (auto i{0}; i < prediction.size(); i++) {
-            polarity[i] = prediction[i] > 0.0;
-        }
-    //}
+    }
     // simplify
     //
     if (conflicts >= curSimplify * nbconfbeforesimplify) {
@@ -2007,12 +1995,13 @@ lbool Solver::search(int &nof_conflicts, Neural &neural) {
     freeze_ls_restart_num--;
     bool can_call_ls = true;
 
-    //if (/*ls_ready && */starts > state_change_time) {
-    /*if (conflicts % 3 == 0)
-        info_based_rephase();
-    else if (conflicts % 5 == 0)
-        rand_based_rephase(seq);
-    else if (conflicts % 2 == 0) {*/
+    if (ls_ready && starts > state_change_time) {
+        if (conflicts % 2 == 0)
+            info_based_rephase();
+        else
+            rand_based_rephase(seq);
+    }
+        /*else if (conflicts % 2 == 0) {
         c.resize(polarity.size());
         for (auto i{0}; i < polarity.size(); i++) {
             c[i] = polarity[i];
@@ -2024,8 +2013,8 @@ lbool Solver::search(int &nof_conflicts, Neural &neural) {
         for (auto i{0}; i < prediction.size(); i++) {
             polarity[i] = prediction[i] > 0.0;
         }
-    //}
-    //}
+    }
+    }*/
 
     // simplify
     //
@@ -2682,6 +2671,15 @@ lbool Solver::solve_() {
                     // std::cout << "c => " << glb << std::endl;
                 } else if (loc < glb) {
                     std::reverse(seq.begin() + std::min(i, j), seq.begin() + std::max(i, j));
+                } else {
+                    c.resize(polarity.size());
+                    for (auto i{0}; i < polarity.size(); i++) {
+                        c[i] = polarity[i];
+                    }
+                    auto prediction = apply_deep(c, neural, std::log(1 + loc));
+                    for (auto i{0}; i < prediction.size(); i++) {
+                        polarity[i] = prediction[i] > 0.0;
+                    }
                 }
                 if (propagations - curr_props > VSIDS_props_limit) {
                     curr_props = propagations;
@@ -3109,7 +3107,7 @@ bool Solver::call_ls(bool use_up_build) {
     return res;
 }
 
-std::vector<double> Solver::apply_deep(std::vector<double> &a, Neural &neural) {
+std::vector<double> Solver::apply_deep(std::vector<double> &a, Neural &neural, double conflicts_range) {
     auto x = dz::as_variable(dz::as_array(nc::asarray(a)));
     std::vector<double> prediction;
     assigns.copyTo(aux);
@@ -3119,8 +3117,7 @@ std::vector<double> Solver::apply_deep(std::vector<double> &a, Neural &neural) {
         for (int j = 0; j < nVars(); j++) {
             assigns[j] = prediction[j] > 0 ? l_True : l_False;
         }
-        auto local = oracle(0);
-        auto loss = F::mean_squared_error(x, y_pred) * local;
+        auto loss = F::mean_squared_error(x, y_pred) * conflicts_range;
 
         neural.cleargrads();
         loss->backward();
@@ -3141,16 +3138,6 @@ std::vector<double> Solver::apply_deep(std::vector<double> &a, Neural &neural) {
                 std::flush(std::cout);
             }
         }
-
-        if (local == 0) {
-            if (call_ls(false)) {
-                for (int j = 0; j < nVars(); j++) {
-                    prediction[j] = ls_best_soln[j];
-                }
-            }
-            return prediction;
-        }
-
         std::swap(y_pred, x);
     }
     aux.copyTo(assigns);

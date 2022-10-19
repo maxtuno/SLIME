@@ -123,7 +123,7 @@ namespace SLIME {
 
         std::vector<double> c;
 
-        std::vector<double> apply_deep(std::vector<double> &a, Neural &neural);
+        std::vector<double> apply_deep(std::vector<double> &a, Neural &neural, double conflicts_range);
 
         dz::data_t lr = 0.01;
         std::size_t max_iter = 1;
