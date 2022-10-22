@@ -1,3 +1,8 @@
+# NEWS
+
+SLIME CERBERO TECH PREVIEW
+https://github.com/maxtuno/SLIME/tree/master/SLIME_CERBERO
+
 # SLIME 
 ## A Free Massive World Class High Performance SAT Solver.
 
