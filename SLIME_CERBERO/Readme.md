@@ -6,7 +6,7 @@ This version of SLIME includes a new technology, quite promising, and currently 
 
 It's a throwback to the original SLIME, but with unprecedented technology.
 
-It is capable of solving 55% crypto track in 1800 seconds (15 mins).
+It is capable of solving 55% crypto track in 1800 seconds (30 mins).
 
     usage:
 
