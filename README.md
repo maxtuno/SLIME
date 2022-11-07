@@ -1,3 +1,6 @@
+# NOTE:
+Soon we will be back to SLIME CORE (with some improvements), the simple, fast and powerful winner of SLIME from cryptotrack, make a backup of this version if you want.
+
 # NEWS
 
 SLIME CERBERO TECH PREVIEW
