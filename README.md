@@ -1,12 +1,4 @@
-# NOTE:
-Soon we will be back to SLIME CORE (with some improvements), the simple, fast and powerful winner of cryptotrack, make a backup of this version if you want.
-
-# NEWS
-
-SLIME CERBERO TECH PREVIEW
-https://github.com/maxtuno/SLIME/tree/master/SLIME_CERBERO
-
-# SLIME 
+# SLIME Cloud 
 ## A Free Massive World Class High Performance SAT Solver.
 
     c
@@ -20,25 +12,24 @@ https://github.com/maxtuno/SLIME/tree/master/SLIME_CERBERO
     c ░  ░  ░    ░ ░    ▒ ░░      ░      ░
     c       ░      ░  ░ ░         ░      ░  ░
     c
-    c              Oscar Riveros
-    c
-    c             [DEEP-LEARNING]
+    c                  [CORE]
     c
 
 ### Winner of Crypto Track and 3rd place on Cloud Track at the SAT Competition 2021 https://satcompetition.github.io/2021/
 <img src="https://raw.githubusercontent.com/maxtuno/SLIME/master/medals.jpeg"/>
 
-# Sequential
-    
-    usage : slime > LICENSE
-    usage : slime <cnf-instance>
-    usage : slime <cnf-instance> <unsat-proof>
-    usage : slime <cnf-instance> <unsat-proof> <sat-model>
-
-# Cloud
-    
-    usage : sh slime_cloud.sh <cnf-instance>
-
-Note: can produce the "UNSAT" proof and SAT model like sequential, only modify the shell command.
+# Cryptography
+  This version of SLIME solve 80% of Crypto Track 2021 at 18000 seconds.
+  
+    usage: 
+    slime -use-distance -cryptography cnf.instance
+    slime -use-distance -cryptography cnf.instance cnf.proof
+    slime -use-distance -cryptography cnf.instance cnf.proof cnf.model
+  
+# General SAT
+    usage:
+    slime cnf.instance
+    slime cnf.instance cnf.proof
+    slime cnf.instance cnf.proof cnf.model
 
 [<img src="https://raw.githubusercontent.com/maxtuno/SLIME/master/jb_beam.png">](https://jb.gg/OpenSourceSupport)

@@ -41,6 +41,9 @@ OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 **************************************************************************************************/
 
+#include <algorithm>
+#include <cmath>
+
 #include "Solver.h"
 #include "mtl/Sort.h"
 
@@ -88,13 +91,11 @@ static BoolOption opt_hess("HESS", "hess", "Specifies the use HESS algorithm.", 
 static IntOption opt_hess_order("HESS", "hess-order", "Specifies the order of HESS algorithm.", 1, IntRange(1, 2));
 static BoolOption opt_massive("MASSIVE", "massive", "Specifies the use for MASSIVE execution.", false);
 
-static BoolOption opt_use_distance("DISTANCE", "use-distance", "Specifies the use DISTANCE algorithm.", true);
+static BoolOption opt_use_distance("DISTANCE", "use-distance", "Specifies the use DISTANCE algorithm.", false);
 static BoolOption opt_invert_polarity("POLARITY", "invert-polarity", "Specifies the invert polarity initialization.", false);
 
-static DoubleOption opt_learning_rate("DEEP-LEARNING", "learning-rate", "specifies the learning rate for the training algorithm.", 0.001, DoubleRange(0, false, HUGE_VAL, false));
-static IntOption opt_max_iter("DEEP-LEARNING", "max-iter", "specifies the number of iterations for the training algorithm on each call.", 1, IntRange(0, INT32_MAX));
-
 static BoolOption opt_crypto("CRYPTOGRAPHY", "cryptography", "Specifies the use of CRYPTOGRAPHY optimizations.", false);
+
 
 #ifdef MASSIVE
 static BoolOption opt_alternate_sharing("MASSIVE", "alternate-sharing", "Specifies alternate sharing clauses on massive algorithm.", true);
@@ -135,7 +136,7 @@ Solver::Solver()
         // simplifyAll adjust occasion
         ,
         curSimplify(1), nbconfbeforesimplify(1000), incSimplify(1000),
-        my_var_decay(0.6), DISTANCE(true), var_iLevel_inc(1), order_heap_distance(VarOrderLt(activity_distance)), use_distance(opt_use_distance), invert_polarity(opt_invert_polarity), lr(opt_learning_rate), max_iter(opt_max_iter), crypto(opt_crypto)
+        my_var_decay(0.6), DISTANCE(true), var_iLevel_inc(1), order_heap_distance(VarOrderLt(activity_distance)), use_distance(opt_use_distance), invert_polarity(opt_invert_polarity), cryptography(opt_crypto)
 #ifdef MASSIVE
 , filter(opt_filter)
 , sharing_clauses(opt_sharing_clauses)
@@ -779,9 +780,6 @@ bool Solver::satisfied(const Clause &c) const {
 void Solver::cancelUntil(int bLevel) {
 
     if (decisionLevel() > bLevel) {
-#ifdef PRINT_OUT
-        std::cout << "bt " << bLevel << "\n";
-#endif
         add_tmp.clear();
         for (int c = trail.size() - 1; c >= trail_lim[bLevel]; c--) {
             Var x = var(trail[c]);
@@ -808,9 +806,6 @@ void Solver::cancelUntil(int bLevel) {
                 }
 
                 assigns[x] = l_Undef;
-#ifdef PRINT_OUT
-                std::cout << "undo " << x << "\n";
-#endif
                 if (phase_saving > 1 || (phase_saving == 1) && c > trail_lim.last()) {
                     polarity[x] = sign(trail[c]);
                     litBumpActivity(mkLit(x, !polarity[x]), lsids_erase_bump_weight);
@@ -1273,9 +1268,6 @@ CRef Solver::propagate() {
 #endif
             } else if (value(the_other) == l_Undef) {
                 uncheckedEnqueue(the_other, currLevel, ws_bin[k].cref);
-#ifdef PRINT_OUT
-                std::cout << "i " << the_other << " l " << currLevel << "\n";
-#endif
             }
         }
 
@@ -1324,9 +1316,6 @@ CRef Solver::propagate() {
             } else {
                 if (currLevel == decisionLevel()) {
                     uncheckedEnqueue(first, currLevel, cr);
-#ifdef PRINT_OUT
-                    std::cout << "i " << first << " l " << currLevel << "\n";
-#endif
                 } else {
                     int nMaxLevel = currLevel;
                     int nMaxInd = 1;
@@ -1346,9 +1335,6 @@ CRef Solver::propagate() {
                     }
 
                     uncheckedEnqueue(first, nMaxLevel, cr);
-#ifdef PRINT_OUT
-                    std::cout << "i " << first << " l " << nMaxLevel << "\n";
-#endif
                 }
             }
 
@@ -1609,7 +1595,7 @@ void Solver::info_based_rephase() {
     }
 }
 
-void Solver::rand_based_rephase(std::vector<int> &seq, Neural &neural) {
+void Solver::rand_based_rephase(std::vector<int> &seq) {
     int var_nums = nVars();
     // local search
     if (seq[0] == 0) {
@@ -1650,18 +1636,10 @@ void Solver::rand_based_rephase(std::vector<int> &seq, Neural &neural) {
         // 50
     else {
         // do nothing
-        c.resize(polarity.size());
-        for (auto i{0}; i < polarity.size(); i++) {
-            c[i] = polarity[i];
-        }
-        auto prediction = apply_deep(c, neural, oracle(0));
-        for (auto i{0}; i < prediction.size(); i++) {
-            polarity[i] = prediction[i] > 0.0;
-        }
     }
 }
 
-lbool Solver::search_aux(int &nof_conflicts, Neural &neural) {
+lbool Solver::search_aux(int &nof_conflicts) {
     assert(ok);
     int backtrack_level;
     int lbd;
@@ -1671,12 +1649,14 @@ lbool Solver::search_aux(int &nof_conflicts, Neural &neural) {
 
     freeze_ls_restart_num--;
     bool can_call_ls = true;
-    if (ls_ready && starts > state_change_time) {
-        if (conflicts % 2 == 0)
-            info_based_rephase();
-        else
-            rand_based_rephase(seq, neural);
-    }
+
+    // if(ls_call_num>1){
+    if (conflicts % 100 < 50) info_based_rephase();
+    else rand_based_rephase(seq);
+    // }
+
+
+
     // simplify
     //
     if (conflicts >= curSimplify * nbconfbeforesimplify) {
@@ -1819,10 +1799,6 @@ lbool Solver::search_aux(int &nof_conflicts, Neural &neural) {
                 attachClause(cr);
 
                 uncheckedEnqueue(learnt_clause[0], backtrack_level, cr);
-#ifdef PRINT_OUT
-                std::cout << "new " << ca[cr] << "\n";
-                std::cout << "ci " << learnt_clause[0] << " l " << backtrack_level << "\n";
-#endif
             }
             if (drup_file) {
 #ifdef BIN_DRUP
@@ -1871,20 +1847,8 @@ lbool Solver::search_aux(int &nof_conflicts, Neural &neural) {
                     can_call_ls = false;
                     mediation_used = false;
                     freeze_ls_restart_num = restarts_gap;
-                    bool res = false;
-                    if (hess) {
-                        if (hess_order == 1) {
-                            if (hess_first_order() == l_True) {
-                                res = true;
-                            }
-                        } else if (hess_order == 2) {
-                            if (hess_second_order() == l_True) {
-                                res = true;
-                            }
-                        }
-                    } else {
-                        res =  call_ls(true);
-                    }
+                    bool res = call_ls(true);
+
                     if (res) {
                         solved_by_ls = true;
                         return l_True;
@@ -1982,14 +1946,11 @@ lbool Solver::search_aux(int &nof_conflicts, Neural &neural) {
             // Increase decision level and enqueue 'next'
             newDecisionLevel();
             uncheckedEnqueue(next, decisionLevel());
-#ifdef PRINT_OUT
-            std::cout << "d " << next << " l " << decisionLevel() << "\n";
-#endif
         }
     }
 }
 
-lbool Solver::search(int &nof_conflicts, Neural &neural) {
+lbool Solver::search(int &nof_conflicts) {
     assert(ok);
     int backtrack_level;
     int lbd;
@@ -2002,27 +1963,12 @@ lbool Solver::search(int &nof_conflicts, Neural &neural) {
     freeze_ls_restart_num--;
     bool can_call_ls = true;
 
-
     if (ls_ready && starts > state_change_time) {
         if (conflicts % 2 == 0)
             info_based_rephase();
         else
-            rand_based_rephase(seq, neural);
+            rand_based_rephase(seq);
     }
-        /*else if (conflicts % 2 == 0) {
-        c.resize(polarity.size());
-        for (auto i{0}; i < polarity.size(); i++) {
-            c[i] = polarity[i];
-        }
-        auto prediction = apply_deep(c, neural);
-        if (solved_by_ls) {
-            return l_True;
-        }
-        for (auto i{0}; i < prediction.size(); i++) {
-            polarity[i] = prediction[i] > 0.0;
-        }
-    }
-    }*/
 
     // simplify
     //
@@ -2176,10 +2122,6 @@ lbool Solver::search(int &nof_conflicts, Neural &neural) {
                 attachClause(cr);
 
                 uncheckedEnqueue(learnt_clause[0], backtrack_level, cr);
-#ifdef PRINT_OUT
-                std::cout << "new " << ca[cr] << "\n";
-                std::cout << "ci " << learnt_clause[0] << " l " << backtrack_level << "\n";
-#endif
             }
             if (drup_file) {
 #ifdef BIN_DRUP
@@ -2248,20 +2190,9 @@ lbool Solver::search(int &nof_conflicts, Neural &neural) {
 
                     can_call_ls = false;
                     mediation_used = false;
-                    bool res = false;
-                    if (hess) {
-                        if (hess_order == 1) {
-                            if (hess_first_order() == l_True) {
-                                res = true;
-                            }
-                        } else if (hess_order == 2) {
-                            if (hess_second_order() == l_True) {
-                                res = true;
-                            }
-                        }
-                    } else {
-                        res =  call_ls(true);
-                    }
+                    freeze_ls_restart_num = restarts_gap;
+                    bool res = call_ls(true);
+
                     if (res) {
                         solved_by_ls = true;
                         return l_True;
@@ -2363,21 +2294,21 @@ static double luby(double y, int x) {
 }
 
 
-double Solver::oracle(int glb) {
-    double falses = 0;
+int Solver::oracle(int glb) {
+    int falses = nClauses() + nLearnts();
     for (int i = 0; i < clauses.size(); i++) {
-        falses += !satisfied(ca[clauses[i]]);
+        falses -= satisfied(ca[clauses[i]]);
     }
     for (int i = 0; i < learnts_core.size(); i++) {
-        falses += !satisfied(ca[learnts_core[i]]);
+        falses -= satisfied(ca[learnts_core[i]]);
     }
     for (int i = 0; i < learnts_tier2.size(); i++) {
-        falses += !satisfied(ca[learnts_tier2[i]]);
+        falses -= satisfied(ca[learnts_tier2[i]]);
     }
     for (int i = 0; i < learnts_local.size(); i++) {
-        falses += !satisfied(ca[learnts_local[i]]);
+        falses -= satisfied(ca[learnts_local[i]]);
     }
-    return falses / (nClauses() + nLearnts());
+    return falses;
 }
 
 lbool Solver::neg(lbool x) {
@@ -2410,10 +2341,7 @@ lbool Solver::hess_second_order() {
                 assigns[i] = neg(assigns[j]);
                 assigns[j] = tmp;
             }
-            if (call_ls(false)) {
-                return l_True;
-            }
-            loc = ccnr.best_found_cost;
+            loc = oracle(glb);
             if (loc < glb) {
                 glb = loc;
                 if (glb < hess_cursor) {
@@ -2487,10 +2415,7 @@ lbool Solver::hess_first_order() {
         bool done = true;
         for (int i = 0; i < nVars(); i++) {
             assigns[i] = neg(assigns[i]);
-            if (call_ls(false)) {
-                return l_True;
-            }
-            loc = ccnr.best_found_cost;
+            loc = oracle(glb);
             if (loc < glb) {
                 glb = loc;
                 if (glb < hess_cursor) {
@@ -2561,23 +2486,17 @@ void inversion(int i, int j, std::vector<int> &seq) {
 
 // NOTE: assumptions passed in member-variable 'assumptions'.
 lbool Solver::solve_() {
-    std::size_t hidden_size = std::round(std::log(nVars()));
-    std::size_t output_size = nVars();
-
-    auto neural = Neural(hidden_size, output_size);
-
 #ifdef MASSIVE
     double gamma = rank; 
     double epsilon = 1.0 / (1.0 + gamma);
     int delta = gamma;
 #endif
-    global_neural = INT32_MAX;
     cursor = 0;
     hess_cursor = INT32_MAX;
     solved_by_hess = false;
     ls_ready = false;
 
-    seq.resize(10);
+    seq.resize(9);
     std::iota(seq.begin(), seq.end(), 0);
 
 #ifdef MASSIVE
@@ -2606,20 +2525,7 @@ lbool Solver::solve_() {
 
     add_tmp.clear();
 
-    int fls_res = 0;
-    if (hess) {
-        if (hess_order == 1) {
-            if (hess_first_order() == l_True) {
-                fls_res = true;
-            }
-        } else if (hess_order == 2) {
-            if (hess_second_order() == l_True) {
-                fls_res = true;
-            }
-        }
-    } else {
-        fls_res = call_ls(false);
-    }
+    int fls_res = call_ls(false);
     if (fls_res) {
         status = l_True;
     }
@@ -2628,7 +2534,7 @@ lbool Solver::solve_() {
 
     VSIDS = true;
     while (status == l_Undef && init > 0)
-        status = search(init, neural);
+        status = search(init);
     VSIDS = false;
 
     duplicates_added_conflicts = 0;
@@ -2654,20 +2560,20 @@ lbool Solver::solve_() {
                 }
                 if (VSIDS) {
                     int weighted = INT32_MAX;
-                    if (crypto) {
-                        status = search(weighted, neural);
+                    if (cryptography) {
+                        status = search(weighted);
                     } else {
-                        status = search_aux(weighted, neural);
+                        status = search_aux(weighted);
                     }
                 } else {
 #ifdef MASSIVE
                     int nof_conflicts = luby(restart_inc * epsilon, curr_restarts) * restart_first + delta;
                     curr_restarts++;
-                    status = search(nof_conflicts, neural);
+                    status = search(nof_conflicts);
 #else
                     int nof_conflicts = luby(restart_inc, curr_restarts) * restart_first;
                     curr_restarts++;
-                    status = search(nof_conflicts, neural);
+                    status = search(nof_conflicts);
 #endif
                 }
                 if (status != l_Undef) {
@@ -2702,6 +2608,14 @@ lbool Solver::solve_() {
                         ht[i[0]][i[1]][i[2]] = i[3];
                     }
                     dupl_db_size -= removed_duplicates;
+
+                    if (hess) {
+                        if (hess_order == 1) {
+                            hess_first_order();
+                        } else if (hess_order == 2) {
+                            hess_second_order();
+                        }
+                    }
                     if (VSIDS) {
                         VSIDS = false;
                     } else {
@@ -2736,20 +2650,20 @@ lbool Solver::solve_() {
         model.growTo(nVars());
         if (solved_by_ls) {
             if (log) {
-                printf("\rc LS!                                          \n");
+                printf("\rc LS!                \n");
             }
             for (int i = 0; i < nVars(); i++)
                 model[i] = ls_mediation_soln[i] ? l_True : l_False;
         } else {
             if (solved_by_hess) {
                 if (log) {
-                    printf("\rc HESS!                                       \n");
+                    printf("\rc HESS!             \n");
                 }
                 for (int i = 0; i < nVars(); i++)
                     model[i] = assigns[i];
             } else {
                 if (log) {
-                    printf("\rc SLIME!                                       \n");
+                    printf("\rc SLIME!             \n");
                 }
                 for (int i = 0; i < nVars(); i++)
                     model[i] = value(i);
@@ -2759,7 +2673,7 @@ lbool Solver::solve_() {
     } else if (status == l_False && conflict.size() == 0) {
         ok = false;
         if (log) {
-            printf("\rc SLIME!                                       \n");
+            printf("\rc SLIME!             \n");
         }
     }
 
@@ -2781,12 +2695,12 @@ static Var mapVar(Var x, vec<Var> &map, Var &max) {
 }
 
 void Solver::toDimacs(FILE *f, Clause &c, vec<Var> &map, Var &max) {
-    if (satisfied(c))
-        return;
+    // if (satisfied(c))
+    //    return;
 
     for (int i = 0; i < c.size(); i++)
         if (value(c[i]) != l_False)
-            fprintf(f, "%s%i ", sign(c[i]) ? "-" : "", mapVar(var(c[i]), map, max) + 1);
+            fprintf(f, "%s%d ", sign(c[i]) ? "-" : "", mapVar(var(c[i]), map, max) + 1);
     fprintf(f, "0\n");
 }
 
@@ -2799,8 +2713,9 @@ void Solver::toDimacs(const char *file, const vec<Lit> &assumps) {
 }
 
 void Solver::toDimacs(FILE *f, const vec<Lit> &assumps) {
-    fprintf(f, "c SLIME SAT Solver\n");
-    fprintf(f, "c https://twitter.com/maxtuno\n");
+    fprintf(f, "c PEQNP - www.peqnp.com\n");
+    fprintf(f, "c contact@peqnp.science\n");
+    fprintf(f, "c pip install PEQNP\n");
 
     // Handle case when solver is in contradictory state:
     if (!ok) {
@@ -2813,27 +2728,29 @@ void Solver::toDimacs(FILE *f, const vec<Lit> &assumps) {
 
     // Cannot use removeClauses here because it is not safe
     // to deallocate them at this point. Could be improved.
-    int cnt = 0;
-    for (int i = 0; i < clauses.size(); i++)
-        if (!satisfied(ca[clauses[i]]))
-            cnt++;
+    // int cnt = 0;
+    // for (int i = 0; i < clauses.size(); i++)
+    //    if (!satisfied(ca[clauses[i]]))
+    //        cnt++;
 
-    for (int i = 0; i < clauses.size(); i++)
-        if (!satisfied(ca[clauses[i]])) {
-            Clause &c = ca[clauses[i]];
-            for (int j = 0; j < c.size(); j++)
-                if (value(c[j]) != l_False)
-                    mapVar(var(c[j]), map, max);
+    for (int i = 0; i < clauses.size(); i++) {
+        // if (!satisfied(ca[clauses[i]])) {
+        Clause &c = ca[clauses[i]];
+        for (int j = 0; j < c.size(); j++) {
+            // if (value(c[j]) != l_False)
+            mapVar(var(c[j]), map, max);
         }
+        // }
+    }
 
     // Assumptions are added as unit clauses:
-    cnt += assumptions.size();
+    // cnt += assumptions.size();
 
-    fprintf(f, "p cnf %i %i\n", max, cnt);
+    fprintf(f, "p cnf %d %d\n", max, assumptions.size() + clauses.size());
 
     for (int i = 0; i < assumptions.size(); i++) {
         assert(value(assumptions[i]) != l_False);
-        fprintf(f, "%s%i 0\n", sign(assumptions[i]) ? "-" : "", mapVar(var(assumptions[i]), map, max) + 1);
+        fprintf(f, "%s%d 0\n", sign(assumptions[i]) ? "-" : "", mapVar(var(assumptions[i]), map, max) + 1);
     }
 
     for (int i = 0; i < clauses.size(); i++)
@@ -3080,11 +2997,8 @@ bool Solver::call_ls(bool use_up_build) {
 
         // use total rand mod
         // call ccanr use rand assign
-        vector<char> signal;
-        for (int i{0}; i < assigns.size(); i++) {
-            signal.emplace_back(assigns[i] == l_True);
-        }
-        res = ccnr.local_search(&signal);
+        vector<char> *rand_signal = 0;
+        res = ccnr.local_search(rand_signal);
     }
 
     // int ls_var_nums = nVars();
@@ -3104,43 +3018,4 @@ bool Solver::call_ls(bool use_up_build) {
         solved_by_ls = true;
     }
     return res;
-}
-
-std::vector<double> Solver::apply_deep(std::vector<double> &a, Neural &neural, double conflicts_range) {
-    auto x = dz::as_variable(dz::as_array(nc::asarray(a)));
-    std::vector<double> prediction;
-    assigns.copyTo(aux);
-    for (int i = 0; i < max_iter; i++) {
-        auto y_pred = neural(x).front();
-        prediction.assign(y_pred->data->begin(), y_pred->data->end());
-        for (int j = 0; j < nVars(); j++) {
-            assigns[j] = prediction[j] > 0 ? l_True : l_False;
-        }
-        auto loss = F::mean_squared_error(x, y_pred) * conflicts_range;
-
-        neural.cleargrads();
-        loss->backward();
-
-        for (auto& param : neural.params()) {
-            *(param->data) -= lr * *(param->grad->data);
-        }
-
-        auto local_neural = loss->data->at(0);
-        if (local_neural < global_neural) {
-            global_neural = local_neural;
-            if (log) {
-                if (massive) {
-                    std::cout << "\rc Loss [" << rank << "] : " << loss << "        ";
-                } else {
-                    std::cout << "\rc Loss : " << loss << "        ";
-                }
-                std::flush(std::cout);
-            }
-        }
-        std::swap(y_pred, x);
-    }
-    aux.copyTo(assigns);
-    auto y_pred = neural(x).front();
-    prediction.assign(y_pred->data->begin(), y_pred->data->end());
-    return prediction;
 }

@@ -86,23 +86,7 @@ namespace SLIME {
     }
 
 //=================================================================================================
-    template<class B>
-    static int get_DIMACS_variables(B &file) {
-        StreamBuffer in(file);
-        for (;;) {
-            skipWhitespace(in);
-            if (*in == EOF) {
-                break;
-            } else if (*in == 'p') {
-                if (eagerMatch(in, "p cnf")) {
-                    return parseInt(in);
-                }
-            } else if (*in == 'c' || *in == 'p') {
-                skipLine(in);
-            }
-        }
-        return 0;
-    }
+
 //=================================================================================================
 } // namespace SLIME
 
