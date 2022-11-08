@@ -2,12 +2,12 @@
 SLIME -- Copyright (c) 2022, Oscar Riveros, oscar.riveros@gmail.com,
 Santiago, Chile. https://github.com/maxtuno/SLIME
 
-SLIME -- Copyright (c) 2021, Oscar Riveros, oscar.riveros@sat-x.io,
+SLIME -- Copyright (c) 2021, Oscar Riveros, oscar.riveros@gmai.com,
 Santiago, Chile. https://github.com/maxtuno/SLIME
 
 DurianSat -- Copyright (c) 2020, Arijit Shaw, Kuldeep S. Meel
 
-SLIME -- Copyright (c) 2019, Oscar Riveros, oscar.riveros@sat-x.io,
+SLIME -- Copyright (c) 2019, Oscar Riveros, oscar.riveros@gmail.com,
 Santiago, Chile. https://maxtuno.github.io/slime-sat-solver
 
 Maple_LCM_Dist_Chrono -- Copyright (c) 2018, Vadim Ryvchin, Alexander Nadel
