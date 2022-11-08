@@ -105,12 +105,12 @@ int main(int argc, char *argv[]) {
         printf("SLIME -- Copyright (c) 2022, Oscar Riveros, oscar.riveros@gmail.com,\n");
         printf("Santiago, Chile. https://github.com/maxtuno/SLIME\n");
         printf("\n");
-        printf("SLIME -- Copyright (c) 2021, Oscar Riveros, oscar.riveros@sat-x.io,\n");
+        printf("SLIME -- Copyright (c) 2021, Oscar Riveros, oscar.riveros@gmail.com,\n");
         printf("Santiago, Chile. https://github.com/maxtuno/SLIME\n");
         printf("\n");
         printf("DurianSat -- Copyright (c) 2020, Arijit Shaw, Kuldeep S. Meel\n");
         printf("\n");
-        printf("SLIME -- Copyright (c) 2019, Oscar Riveros, oscar.riveros@sat-x.io,\n");
+        printf("SLIME -- Copyright (c) 2019, Oscar Riveros, oscar.riveros@gmail.com,\n");
         printf("Santiago, Chile. https://maxtuno.github.io/slime-sat-solver\n");
         printf("\n");
         printf("Maple_LCM_Dist_Chrono -- Copyright (c) 2018, Vadim Ryvchin, Alexander Nadel\n");
