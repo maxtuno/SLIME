@@ -32,5 +32,9 @@
     slime cnf.instance
     slime cnf.instance cnf.proof
     slime cnf.instance cnf.proof cnf.model
+    
+### Research Papers Citing SLIME
 
-[<img src="https://raw.githubusercontent.com/maxtuno/SLIME/master/jb_beam.png">](https://jb.gg/OpenSourceSupport)
+Certifying Parity Reasoning Efficiently Using Pseudo-Boolean Proofs https://arxiv.org/abs/2209.12185
+
+Power-aware test scheduling framework for IEEE 1687 multi-power domain networks using formal techniques https://www.sciencedirect.com/science/article/abs/pii/S0026271422000750
