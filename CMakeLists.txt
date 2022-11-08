@@ -10,7 +10,7 @@ include_directories(
         include
         )
 
-set(CMAKE_CXX_FLAGS "-std=c++11 -D LOG -static")
+set(CMAKE_CXX_FLAGS "-std=c++11 -D LOG")
 add_executable(slime
         src/Ls.cc
         src/Main.cc
