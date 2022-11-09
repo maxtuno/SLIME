@@ -38,3 +38,5 @@
 Certifying Parity Reasoning Efficiently Using Pseudo-Boolean Proofs https://arxiv.org/abs/2209.12185
 
 Power-aware test scheduling framework for IEEE 1687 multi-power domain networks using formal techniques https://www.sciencedirect.com/science/article/abs/pii/S0026271422000750
+
+SAT Solving in the Serverless Cloud https://par.nsf.gov/servlets/purl/10319044
