@@ -35,6 +35,8 @@
     
 ### Research Papers Citing SLIME
 
+Diversifying a Parallel SAT Solver with Bayesian Moment Matching https://link.springer.com/chapter/10.1007/978-3-031-21213-0_14
+
 Certifying Parity Reasoning Efficiently Using Pseudo-Boolean Proofs https://arxiv.org/abs/2209.12185
 
 Power-aware test scheduling framework for IEEE 1687 multi-power domain networks using formal techniques https://www.sciencedirect.com/science/article/abs/pii/S0026271422000750
@@ -42,5 +44,3 @@ Power-aware test scheduling framework for IEEE 1687 multi-power domain networks 
 SAT Solving in the Serverless Cloud https://ieeexplore.ieee.org/document/9617671 https://par.nsf.gov/servlets/purl/10319044
 
 Algebraic Analysis of a Simplified Encryption Algorithm GOST R 34.12-2015 https://www.mdpi.com/2079-3197/8/2/51
-
-Diversifying a Parallel SAT Solver with Bayesian Moment Matching https://link.springer.com/chapter/10.1007/978-3-031-21213-0_14
